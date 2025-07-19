@@ -22,7 +22,9 @@ model User {
   username  String?     @unique  // 🟢 nullable
   status    String?     // 🟢 nullable
   dept      String?
-
+  active    Boolean  @default(false) // 🟢 เพิ่ม field active สำหรับอีเมลยืนยัน
+  otp         String?                 // ✅ เก็บ OTP
+  otpExpiry   DateTime?               // ✅ เวลา OTP หมดอายุ
   cartItems CartItem[]  @relation("UserCartItems")
 }
 
