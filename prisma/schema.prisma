@@ -1,0 +1,55 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+model User {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String      @unique
+  password  String
+  role      String      @default("user")  // role มีค่า default = user
+  createdAt DateTime    @default(now())
+
+  // ✅ เพิ่ม field ใหม่ให้ nullable
+  username  String?     @unique  // 🟢 nullable
+  status    String?     // 🟢 nullable
+  dept      String?
+
+  cartItems CartItem[]  @relation("UserCartItems")
+}
+
+model Product {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  price       Float
+  stock       Json                     // {"S": 10, "M": 20, ...}
+  imageUrls   String[]                 // array ของรูป
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+
+  // ✅ เพิ่ม field relation กลับ
+  cartItems   CartItem[]  @relation("ProductCartItems")
+}
+
+model CartItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  productId  String   @db.ObjectId
+  quantity   Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // ✅ เพิ่ม relation
+  user       User     @relation("UserCartItems", fields: [userId], references: [id])
+  product    Product  @relation("ProductCartItems", fields: [productId], references: [id])
+}
