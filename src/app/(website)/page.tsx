@@ -5,7 +5,7 @@ export default function Home() {
     <>
       <Navbar />
       <div>
-        ljdfgklhbk
+        Home
       </div>
     </>
   )
