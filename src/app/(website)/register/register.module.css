@@ -1,0 +1,59 @@
+.container {
+    background-color: #f0f4ff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px;
+    box-sizing: border-box;
+  }
+  
+  .formBox {
+    background-color: white;
+    padding: 40px;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 800px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  
+  .subtitle {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 30px;
+  }
+  
+  .input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    border: none;
+    border-bottom: 2px solid #333;
+    font-size: 16px;
+    background-color: transparent;
+    outline: none;
+  }
+  
+  .button {
+    width: 100%;
+    padding: 14px;
+    background-color: #ddd;
+    color: black;
+    font-weight: bold;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 50px;
+  }
+  
+  .button:hover {
+    background-color: #bbb;
+  }
+  
