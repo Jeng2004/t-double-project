@@ -1,0 +1,61 @@
+.container {
+  display: flex;
+  gap: 40px;
+  padding: 40px;
+  background-color: #fff;
+}
+
+.cartSection {
+  flex: 3;
+  width: 100%;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr; /* 👈 ตรงกับ CartItem */
+  padding: 10px 20px;
+  background-color: #000;
+  color: #fff;
+  font-weight: bold;
+}
+
+
+.columnProduct,
+.columnPrice,
+.columnQty {
+  padding: 0 10px;
+  text-align: center;
+}
+
+.summary {
+  flex: 1;
+  border-left: 1px solid #ddd;
+  padding-left: 20px;
+}
+
+.summary h3 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.checkout,
+.continue {
+  width: 100%;
+  padding: 12px;
+  font-weight: bold;
+  background-color: #000;
+  color: white;
+  border: none;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.continue {
+  background-color: #333;
+}
