@@ -12,21 +12,27 @@ datasource db {
 
 model User {
   id        String      @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
+  name      String?
   email     String      @unique
   password  String
   role      String      @default("user")  // role มีค่า default = user
   createdAt DateTime    @default(now())
 
-  // ✅ เพิ่ม field ใหม่ให้ nullable
-  username  String?     @unique  // 🟢 nullable
-  status    String?     // 🟢 nullable
+  // :white_check_mark: เพิ่ม field ใหม่ให้ nullable
+  username  String?     @unique  // :green_circle: nullable
+  status    String?     // :green_circle: nullable
   dept      String?
-  active    Boolean  @default(false) // 🟢 เพิ่ม field active สำหรับอีเมลยืนยัน
-  otp         String?                 // ✅ เก็บ OTP
-  otpExpiry   DateTime?               // ✅ เวลา OTP หมดอายุ
+  active    Boolean  @default(false) // :green_circle: เพิ่ม field active สำหรับอีเมลยืนยัน
+  otp         String?                 // :white_check_mark: เก็บ OTP
+  otpExpiry   DateTime?               // :white_check_mark: เวลา OTP หมดอายุ
   cartItems CartItem[]  @relation("UserCartItems")
+
+  //profile
+  phone        String?    // ✅ เบอร์โทรศัพท์
+  address      String?    // ✅ ที่อยู่
+  profileImage String?    // ✅ URL รูปโปรไฟล์
 }
+
 
 model Product {
   id          String      @id @default(auto()) @map("_id") @db.ObjectId
@@ -39,7 +45,7 @@ model Product {
   updatedAt   DateTime    @updatedAt
 
 
-  // ✅ เพิ่ม field relation กลับ
+  // :white_check_mark: เพิ่ม field relation กลับ
   cartItems   CartItem[]  @relation("ProductCartItems")
 }
 
@@ -51,7 +57,7 @@ model CartItem {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  // ✅ เพิ่ม relation
+  // :white_check_mark: เพิ่ม relation
   user       User     @relation("UserCartItems", fields: [userId], references: [id])
   product    Product  @relation("ProductCartItems", fields: [productId], references: [id])
 }
