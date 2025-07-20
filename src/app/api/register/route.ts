@@ -20,32 +20,40 @@ const transporter = nodemailer.createTransport({
 export async function POST(req: NextRequest) {
     const { username, name, email, password, status, dept, role } = await req.json();
 
-    if (!name || !email || !password) {
+    if (!username || !email || !password) {
         return NextResponse.json(
-            { error: 'Name, email, and password are required' },
+            { error: 'Username, email, and password are required' },
             { status: 400 }
         );
     }
 
-    const generatedUsername =
-        username || `${name.replace(/\s+/g, '').toLowerCase()}-${Date.now()}`;
     const userStatus = status || 'active';
     const validRoles = ['admin', 'user'];
     const userRole = validRoles.includes(role) ? role : 'user';
 
     if (
         userRole === 'user' &&
-        (/admin/i.test(name) || /admin/i.test(email))
+        (/admin/i.test(username) || /admin/i.test(email))
     ) {
         return NextResponse.json(
-            { error: 'ชื่อหรืออีเมลไม่สามารถมีคำว่า "admin" ได้' },
+            { error: 'ชื่อผู้ใช้หรืออีเมลไม่สามารถมีคำว่า "admin" ได้' },
             { status: 400 }
         );
     }
 
     try {
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser) {
+        // 🔥 ตรวจสอบ username ซ้ำ
+        const existingUsername = await prisma.user.findUnique({ where: { username } });
+        if (existingUsername) {
+            return NextResponse.json(
+                { error: 'Username นี้ถูกใช้แล้ว' },
+                { status: 409 }
+            );
+        }
+
+        // 🔥 ตรวจสอบ email ซ้ำ
+        const existingEmail = await prisma.user.findUnique({ where: { email } });
+        if (existingEmail) {
             return NextResponse.json(
                 { error: 'อีเมลนี้ถูกใช้ลงทะเบียนแล้ว' },
                 { status: 409 }
@@ -58,16 +66,16 @@ export async function POST(req: NextRequest) {
 
         const newUser = await prisma.user.create({
             data: {
-                username: generatedUsername,
-                name,
+                username, // ✅ username สำหรับ login
+                name: name || username, // ✅ name แสดงบนโปรไฟล์ ถ้าไม่ได้ส่ง name ใช้ username แทน
                 email,
                 password: hashedPassword,
                 status: userStatus,
-                dept: dept,
+                dept,
                 role: userRole,
                 active: false,
-                otp: otp,
-                otpExpiry: otpExpiry,
+                otp,
+                otpExpiry,
             },
         });
 
