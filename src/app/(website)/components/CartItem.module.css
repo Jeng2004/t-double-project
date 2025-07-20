@@ -1,0 +1,50 @@
+.cartItem {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  padding: 10px 20px;
+  border: 1px solid #ddd;
+  margin-top: 10px;
+  align-items: center;
+  width: 100%; /* ✅ ตรงกับ header */
+  box-sizing: border-box; /* ✅ ให้ padding อยู่ใน width */
+
+}
+
+.itemInfo {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.itemName {
+  font-weight: bold;
+}
+
+.itemDetail {
+  font-size: 13px;
+  color: #555;
+}
+
+.itemPrice {
+  text-align: center;
+  font-weight: bold;
+}
+
+.qtyControl {
+  display: flex;
+  text-align: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+.qtyControl button {
+  background: #eee;
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.trash {
+  background: transparent;
+  font-size: 18px;
+}
