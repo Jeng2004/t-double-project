@@ -18,13 +18,19 @@ export default function Navbar() {
           <button
             onClick={() => router.push('/')}
             className="hover:underline focus:outline-none">
-            Home
+            HOME
           </button>
 
           <button
-            onClick={() => router.push('/shop')}
+            onClick={() => router.push('/tee')}
             className="hover:underline focus:outline-none">
-            Shop
+            TEE
+          </button>
+
+                    <button
+            onClick={() => router.push('/sweats')}
+            className="hover:underline focus:outline-none">
+            SWEATS
           </button>
 
         </div>

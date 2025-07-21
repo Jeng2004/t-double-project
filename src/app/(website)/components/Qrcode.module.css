@@ -1,0 +1,57 @@
+.modal {
+  padding: 40px;
+  background: #fff;
+  border-radius: 12px;
+  max-width: 480px; /* ✅ ขยายกล่อง */
+  margin: 0 auto;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.title {
+  font-size: 22px;
+  margin-bottom: 35px; /* ✅ เพิ่มระยะห่างหัวข้อ */
+}
+
+.qr {
+  display: block;
+  margin: 0 auto 30px auto; /* ✅ เพิ่มระยะห่างด้านล่าง */
+}
+
+.label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 30px;
+  margin-top: 10px; /* ✅ เพิ่มระยะห่างด้านบน */
+}
+
+.inputWrapper {
+  border: 2px dashed #888;
+  padding: 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #333;
+  font-size: 15px;
+  background-color: #f9f9f9;
+  transition: background-color 0.2s ease;
+}
+
+.inputWrapper:hover {
+  background-color: #eee;
+}
+
+.input {
+  display: none;
+}
+
+.submit {
+  padding: 12px 24px;
+  background-color: #000;
+  color: white;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  border-radius: 6px;
+  margin-top: 30px; /* ✅ เพิ่มช่องว่างด้านบนปุ่ม */
+}

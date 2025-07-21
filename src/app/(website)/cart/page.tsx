@@ -3,8 +3,10 @@
 import styles from './cart.module.css';
 import Navbar from '../components/Navbar';
 import CartItem from '../components/CartItem';
+import { useRouter } from 'next/navigation';
 
 export default function CartPage() {
+  const router = useRouter();
   const cartItems = [
     {
       id: 1,
@@ -76,7 +78,10 @@ export default function CartPage() {
             <span>{total.toFixed(2)}฿</span>
           </div>
 
-          <button className={styles.checkout}>ดำเนินการชำระเงิน</button>
+          <button
+            className={styles.checkout}
+            onClick={() => router.push('/Order-details')}>ดำเนินการชำระเงิน
+          </button>
           <button className={styles.continue}>เลือกซื้อสินค้าต่อ</button>
         </div>
       </div>
