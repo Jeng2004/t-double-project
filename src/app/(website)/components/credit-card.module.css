@@ -1,0 +1,43 @@
+.modal {
+  width: 100%;
+  max-width: 500px;   /* ✅ ขยายได้ตามต้องการ */
+  padding: 40px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0,0,0,0.2);
+  box-sizing: border-box;
+}
+
+
+.title {
+  font-size: 22px; /* ✅ ใหญ่ขึ้นนิดนึง */
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.input {
+  width: 100%;
+  padding: 14px; /* ✅ ขยายขอบใน */
+  margin-bottom: 12px; /* ✅ เพิ่มระยะห่าง */
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.row {
+  display: flex;
+  gap: 12px; /* ✅ เพิ่มช่องว่างระหว่างช่อง */
+}
+
+.submit {
+  width: 100%;
+  padding: 14px;
+  background-color: #000;
+  color: white;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  margin-top: 16px;
+  font-size: 15px;
+  border-radius: 6px;
+}
