@@ -1,0 +1,95 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal {
+  background: #fff;
+  padding: 20px 30px;           /* ลดความสูงแนวตั้ง */
+  border-radius: 12px;
+  width: 600px;                 /* ✅ เพิ่มความกว้าง */
+  max-height: 90vh;            /* ✅ จำกัดความสูงรวม */
+  overflow-y: auto;            /* ✅ ถ้าเกินให้เลื่อน */
+  position: relative;
+}
+
+
+.closeButton {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.title {
+  text-align: center;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form input[type="text"],
+.form input[type="number"],
+.form select {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.priceInput {
+  display: flex;
+  align-items: center;
+}
+
+.priceInput input {
+  flex: 1;
+  margin-right: 8px;
+}
+
+.uploadBox input[type="file"] {
+  padding: 10px;
+  border: 1px dashed #ccc;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.submitButton {
+  background: black;
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.form label {
+  font-weight: bold;
+}
+
+.sizeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.sizeItem label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}

@@ -1,0 +1,92 @@
+.container {
+  display: flex;
+  padding: 40px;
+  background: #f7f7f7;
+}
+
+.left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.imagePlaceholder {
+  width: 80%;
+  height: 400px;
+  background: #d9d9d9;
+}
+
+.right {
+  flex: 1;
+  padding: 0 40px;
+}
+
+.title {
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.line {
+  margin: 10px 0 30px;
+  border: none;
+  border-bottom: 1px solid #aaa;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.input {
+  padding: 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.priceRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.currency {
+  font-weight: bold;
+}
+
+.uploadBox {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fff;
+  font-size: 14px;
+}
+
+.fileInput {
+  display: none;
+}
+
+.icon {
+  font-size: 18px;
+}
+
+.submit {
+  margin-top: 20px;
+  background: black;
+  color: white;
+  font-weight: bold;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  width: fit-content;
+  align-self: center;
+}
