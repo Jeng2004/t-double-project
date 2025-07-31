@@ -11,19 +11,22 @@ datasource db {
 }
 
 model User {
-  id        String      @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  email     String      @unique
-  password  String
-  role      String      @default("user")  // role มีค่า default = user
-  createdAt DateTime    @default(now())
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  email      String      @unique
+  password   String
+  role       String      @default("user")  // role มีค่า default = user
+  createdAt  DateTime    @default(now())
 
-  // ✅ เพิ่ม field ใหม่ให้ nullable
-  username  String?     @unique  // 🟢 nullable
-  status    String?     // 🟢 nullable
-  dept      String?
+  username   String?     @unique
+  status     String?
+  dept       String?
 
-  cartItems CartItem[]  @relation("UserCartItems")
+  active     Boolean     @default(false)
+  otp        String?
+  otpExpiry  DateTime?
+
+  cartItems  CartItem[]  @relation("UserCartItems")
 }
 
 model Product {
@@ -36,8 +39,6 @@ model Product {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-
-  // ✅ เพิ่ม field relation กลับ
   cartItems   CartItem[]  @relation("ProductCartItems")
 }
 
@@ -49,7 +50,6 @@ model CartItem {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  // ✅ เพิ่ม relation
   user       User     @relation("UserCartItems", fields: [userId], references: [id])
   product    Product  @relation("ProductCartItems", fields: [productId], references: [id])
 }
