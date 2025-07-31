@@ -45,7 +45,7 @@ model Product {
   updatedAt   DateTime    @updatedAt
 
 
-  // :white_check_mark: เพิ่ม field relation กลับ
+
   cartItems   CartItem[]  @relation("ProductCartItems")
 }
 
@@ -57,7 +57,7 @@ model CartItem {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  // :white_check_mark: เพิ่ม relation
+
   user       User     @relation("UserCartItems", fields: [userId], references: [id])
   product    Product  @relation("ProductCartItems", fields: [productId], references: [id])
 }

@@ -2,17 +2,57 @@
 
 import styles from './register.module.css';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
+  const router = useRouter();
+
   const [formData, setFormData] = useState({
+    username: '',
     name: '',
-    surname: '',
     email: '',
     password: '',
+    confirmPassword: '',
   });
+
+  const [message, setMessage] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async () => {
+    setMessage('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setMessage('❌ รหัสผ่านไม่ตรงกัน');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        router.push(`/Confirm-OTP?token=${data.otpToken}&email=${formData.email}`);
+      } else {
+        setMessage(`❌ ${data.error || 'เกิดข้อผิดพลาด'}`);
+      }
+    } catch (err) {
+      setMessage('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
   };
 
   return (
@@ -23,17 +63,17 @@ export default function RegisterPage() {
 
         <input
           type="text"
-          name="name"
-          placeholder="ชื่อ"
-          value={formData.name}
+          name="username"
+          placeholder="ชื่อผู้ใช้ (username)"
+          value={formData.username}
           onChange={handleChange}
           className={styles.input}
         />
         <input
           type="text"
-          name="surname"
-          placeholder="นามสกุล"
-          value={formData.surname}
+          name="name"
+          placeholder="ชื่อ-นามสกุล"
+          value={formData.name}
           onChange={handleChange}
           className={styles.input}
         />
@@ -53,8 +93,20 @@ export default function RegisterPage() {
           onChange={handleChange}
           className={styles.input}
         />
+        <input
+          type="password"
+          name="confirmPassword"
+          placeholder="ยืนยันรหัสผ่าน"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          className={styles.input}
+        />
 
-        <button className={styles.button}>SIGN UP</button>
+        {message && <p className={styles.message}>{message}</p>}
+
+        <button className={styles.button} onClick={handleSubmit}>
+          SIGN UP
+        </button>
       </div>
     </div>
   );
