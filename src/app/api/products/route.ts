@@ -1,3 +1,5 @@
+// /api/products/route.ts
+
 export const runtime = 'nodejs';
 export const config = { api: { bodyParser: false } };
 
@@ -115,5 +117,16 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('❌ POST error:', err);
     return NextResponse.json({ error: err.message || 'Failed to add product' }, { status: 500 });
+  }
+}
+
+// 📦 GET: ดึงสินค้าทั้งหมด
+export async function GET() {
+  try {
+    const products = await prisma.product.findMany(); // ดึงข้อมูลทั้งหมดจาก DB
+    return NextResponse.json(products, { status: 200 });
+  } catch (err: any) {
+    console.error('❌ GET error:', err);
+    return NextResponse.json({ error: err.message || 'Failed to fetch products' }, { status: 500 });
   }
 }
