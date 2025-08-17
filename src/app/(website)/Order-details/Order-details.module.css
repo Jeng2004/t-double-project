@@ -1,0 +1,109 @@
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 20px;
+  background-color: #fff;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.title {
+  font-size: 16px;
+  margin: 20px 0 5px;
+  font-weight: bold;
+}
+
+.input,
+.select {
+  padding: 10px;
+  border: 2px solid #cbcbcb; /* เปลี่ยนจาก 1px เป็น 2px และใช้สีเข้ม */
+  border-radius: 4px;
+  outline: none;
+}
+
+.input:focus,
+.select:focus {
+  border-color: #454545; /* ขอบดำเมื่อ focus */
+  box-shadow: 0 0 0 1px #454545; /* เพิ่มเงาขอบ */
+}
+
+.nameRow {
+  display: flex;
+  gap: 10px;
+}
+
+.checkboxLabel {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.orderSummary {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border: 1px solid #eee;
+  padding: 10px;
+}
+
+.productName {
+  font-weight: bold;
+}
+
+.productDetail {
+  font-size: 13px;
+  color: #555;
+}
+
+.price {
+  margin-left: auto;
+  font-weight: bold;
+}
+
+.submitBtn {
+  background-color: #000;
+  color: white;
+  font-weight: bold;
+  padding: 12px;
+  border: none;
+  cursor: pointer;
+  margin-top: 20px;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalBox {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  position: relative;
+  max-width: 500px;  /* 🔧 เพิ่มจาก 400px เป็น 600px หรือมากกว่านี้ */
+  width: 90%;
+}
+
+
+.closeBtn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+}

@@ -38,9 +38,9 @@ model Product {
   imageUrls   String[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-
   cartItems   CartItem[]   @relation("ProductCartItems")
   orderItems  OrderItem[]  @relation("ProductOrderItems") // ✅ เพิ่มความสัมพันธ์กับ OrderItem
+  cartItems   CartItem[]  @relation("ProductCartItems")
 }
 
 model CartItem {
@@ -51,7 +51,6 @@ model CartItem {
   size       String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
   user       User     @relation("UserCartItems", fields: [userId], references: [id])
   product    Product  @relation("ProductCartItems", fields: [productId], references: [id])
 }

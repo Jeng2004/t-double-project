@@ -15,23 +15,25 @@ export default function Navbar() {
         </div>
 
         <div className="hidden md:flex space-x-6 text-sm">
+
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/Order-admin')}
             className="hover:underline focus:outline-none">
-            HOME
+            Order
           </button>
 
           <button
-            onClick={() => router.push('/tee')}
+            onClick={() => router.push('/stock-admin')}
             className="hover:underline focus:outline-none">
-            TEE
+            Products in stock
           </button>
 
-                    <button
-            onClick={() => router.push('/sweats')}
+          <button
+            onClick={() => router.push('/Add-product-admin')}
             className="hover:underline focus:outline-none">
-            SWEATS
+            Add product
           </button>
+
 
         </div>
       </div>

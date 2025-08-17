@@ -1,0 +1,43 @@
+.card {
+  width: 300px;
+  background-color: #f9f9f9;
+  padding: 16px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.imageWrapper {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  position: relative;
+  background-color: #fff;
+}
+
+.image {
+  object-fit: contain;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #222;
+}
+
+.price {
+  font-size: 14px;
+  color: #111;
+}
+
+.outOfStock {
+  font-size: 14px;
+  color: red;
+  font-weight: 500;
+}
