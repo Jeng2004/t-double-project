@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,41 +8,38 @@ datasource db {
 }
 
 model User {
-  id        String      @id @default(auto()) @map("_id") @db.ObjectId
-  name      String?
-  email     String      @unique
-  password  String
-  role      String      @default("user")  // role มีค่า default = user
-  createdAt DateTime    @default(now())
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String      @unique
+  password      String
+  role          String      @default("user")
+  createdAt     DateTime    @default(now())
+  username      String?     @unique
+  status        String?
+  dept          String?
+  active        Boolean     @default(false)
+  otp           String?
+  otpExpiry     DateTime?
+  cartItems     CartItem[]  @relation("UserCartItems")
+  phone         String?
+  address       String?
+  profileImage  String?
 
-  // :white_check_mark: เพิ่ม field ใหม่ให้ nullable
-  username  String?     @unique  // :green_circle: nullable
-  status    String?     // :green_circle: nullable
-  dept      String?
-  active    Boolean  @default(false) // :green_circle: เพิ่ม field active สำหรับอีเมลยืนยัน
-  otp         String?                 // :white_check_mark: เก็บ OTP
-  otpExpiry   DateTime?               // :white_check_mark: เวลา OTP หมดอายุ
-  cartItems CartItem[]  @relation("UserCartItems")
-
-  //profile
-  phone        String?    // ✅ เบอร์โทรศัพท์
-  address      String?    // ✅ ที่อยู่
-  profileImage String?    // ✅ URL รูปโปรไฟล์
+  // 🟢 ความสัมพันธ์กับ Order
+  orders        Order[]
 }
 
-
 model Product {
-  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
   price       Float
-  stock       Json                     // {"S": 10, "M": 20, ...}
-  imageUrls   String[]                 // array ของรูป
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-
-
+  stock       Json          // {"S": 10, "M": 20, ...}
+  imageUrls   String[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  cartItems   CartItem[]   @relation("ProductCartItems")
+  orderItems  OrderItem[]  @relation("ProductOrderItems") // ✅ เพิ่มความสัมพันธ์กับ OrderItem
   cartItems   CartItem[]  @relation("ProductCartItems")
 }
 
@@ -54,10 +48,30 @@ model CartItem {
   userId     String   @db.ObjectId
   productId  String   @db.ObjectId
   quantity   Int      @default(1)
+  size       String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-
   user       User     @relation("UserCartItems", fields: [userId], references: [id])
   product    Product  @relation("ProductCartItems", fields: [productId], references: [id])
+}
+
+model Order {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String       @db.ObjectId
+  user        User         @relation(fields: [userId], references: [id])
+  totalAmount Float
+  status      String       @default("pending") // 'pending' | 'paid' | 'shipped' | 'cancelled'
+  createdAt   DateTime     @default(now())
+  orderItems  OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String   @db.ObjectId
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId String   @db.ObjectId
+  product   Product  @relation("ProductOrderItems", fields: [productId], references: [id]) // ✅ เพิ่มชื่อ relation ให้สัมพันธ์
+  quantity  Int
+  price     Float
+  size      String
 }

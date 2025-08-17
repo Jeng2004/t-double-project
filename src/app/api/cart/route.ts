@@ -30,24 +30,23 @@ export async function GET(req: NextRequest) {
 
 // ➕ POST - เพิ่มสินค้าเข้าตะกร้า
 export async function POST(req: NextRequest) {
-  const { userId, productId, quantity } = await req.json();
+  const { userId, productId, quantity, size } = await req.json();
 
-  if (!userId || !productId || quantity <= 0) {
+  if (!userId || !productId || quantity <= 0 || !size) {
     return NextResponse.json(
-      { error: "ข้อมูลไม่ครบหรือ quantity ไม่ถูกต้อง" },
+      { error: "ข้อมูลไม่ครบหรือ quantity/size ไม่ถูกต้อง" },
       { status: 400 }
     );
   }
 
   try {
-    // ✅ ตรวจสอบว่า productId มีอยู่จริง
     const productExists = await prisma.product.findUnique({ where: { id: productId } });
     if (!productExists) {
       return NextResponse.json({ error: "ไม่พบสินค้า" }, { status: 404 });
     }
 
     const existingItem = await prisma.cartItem.findFirst({
-      where: { userId, productId },
+      where: { userId, productId, size },
     });
 
     let result;
@@ -58,7 +57,7 @@ export async function POST(req: NextRequest) {
       });
     } else {
       result = await prisma.cartItem.create({
-        data: { userId, productId, quantity },
+        data: { userId, productId, quantity, size },
       });
     }
 
@@ -71,23 +70,23 @@ export async function POST(req: NextRequest) {
 
 // 🔄 PATCH - อัปเดตจำนวนสินค้า
 export async function PATCH(req: NextRequest) {
-  const { userId, productId, quantity } = await req.json();
+  const { userId, productId, quantity, size } = await req.json();
 
-  if (!userId || !productId || quantity < 0) {
+  if (!userId || !productId || quantity < 0 || !size) {
     return NextResponse.json(
-      { error: "ข้อมูลไม่ครบหรือ quantity ไม่ถูกต้อง" },
+      { error: "ข้อมูลไม่ครบหรือ quantity/size ไม่ถูกต้อง" },
       { status: 400 }
     );
   }
 
   try {
     if (quantity === 0) {
-      await prisma.cartItem.deleteMany({ where: { userId, productId } });
+      await prisma.cartItem.deleteMany({ where: { userId, productId, size } });
       return NextResponse.json({ message: "ลบสินค้าเรียบร้อย" }, { status: 200 });
     }
 
     const updated = await prisma.cartItem.updateMany({
-      where: { userId, productId },
+      where: { userId, productId, size },
       data: { quantity },
     });
 
@@ -104,9 +103,9 @@ export async function PATCH(req: NextRequest) {
 
 // 🗑 DELETE - ลบสินค้าออกจากตะกร้า
 export async function DELETE(req: NextRequest) {
-  const { userId, productId } = await req.json();
+  const { userId, productId, size } = await req.json();
 
-  if (!userId || !productId) {
+  if (!userId || !productId || !size) {
     return NextResponse.json(
       { error: "ข้อมูลไม่ครบ" },
       { status: 400 }
@@ -115,7 +114,7 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const deleted = await prisma.cartItem.deleteMany({
-      where: { userId, productId },
+      where: { userId, productId, size },
     });
 
     if (deleted.count === 0) {
