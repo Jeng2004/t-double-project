@@ -1,0 +1,79 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #fff;
+  padding: 30px 20px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  text-align: center;
+}
+
+.closeBtn {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.header {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.avatar {
+  margin-bottom: 30px;
+}
+
+.field {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.field label {
+  font-weight: bold;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.inputBox {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.arrow {
+  font-size: 18px;
+}
+
+.saveBtn {
+  margin-top: 24px;
+  width: 100%;
+  background-color: #000;
+  color: white;
+  font-weight: bold;
+  border: none;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}

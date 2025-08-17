@@ -1,0 +1,45 @@
+.title {
+  margin-bottom: 20px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.orderList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.orderItem {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.productName {
+  font-weight: bold;
+  margin: 0;
+}
+
+.productDetail {
+  font-size: 13px;
+  color: #555;
+}
+
+.price {
+  font-weight: bold;
+  margin-left: auto;
+  padding-right: 10px;
+}
+
+.statusPending {
+  color: red;
+  font-size: 13px;
+}
+
+.statusSuccess {
+  color: limegreen;
+  font-size: 13px;
+}
