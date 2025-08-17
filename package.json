@@ -16,8 +16,10 @@
     "jsonwebtoken": "^9.0.2",
     "next": "15.4.1",
     "nodemailer": "^7.0.5",
+    "omise": "^1.0.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "stripe": "^18.4.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
