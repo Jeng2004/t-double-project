@@ -1,13 +1,21 @@
-export const runtime = 'nodejs';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// สร้างประเภทของ item สำหรับ orderItems
+type OrderItem = {
+  productId: string;
+  quantity: number;
+  price: number;  // เปลี่ยนเป็นจำนวนเต็ม (Int32)
+  size: string;
+  unitPrice: number;  // unitPrice ที่เก็บจากตะกร้า
+  totalPrice: number;  // totalPrice ที่เก็บจากตะกร้า
+};
+
 export async function POST(req: NextRequest) {
   try {
-    console.log('📥 รับคำร้อง POST /api/order');
+    console.log('📥 รับคำร้อง POST /api/order'); // Log when the API is called
 
     const { userId, items, address, phone, name, email } = await req.json();
     console.log('📦 ข้อมูลที่รับมา:', { userId, items, address, phone, name, email });
@@ -25,6 +33,7 @@ export async function POST(req: NextRequest) {
     }
     console.log('✅ พบผู้ใช้:', user.email);
 
+    // ตรวจสอบข้อมูลในโปรไฟล์ผู้ใช้
     const missingFields: string[] = [];
     if (!user.name && !name) missingFields.push('name');
     if (!user.phone && !phone) missingFields.push('phone');
@@ -38,6 +47,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // อัปเดตข้อมูลโปรไฟล์ผู้ใช้
     if (!user.name || !user.phone || !user.address || !user.email) {
       console.log('🔄 อัปเดตข้อมูลโปรไฟล์...');
       await prisma.user.update({
@@ -52,7 +62,8 @@ export async function POST(req: NextRequest) {
       console.log('✅ อัปเดตโปรไฟล์สำเร็จ');
     }
 
-    let orderItems = items;
+    let orderItems: OrderItem[] = items;
+    let totalAmount = 0; // สำหรับการคำนวณยอดรวม
     if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
       console.log('🛒 ไม่มี items ที่ส่งมา ใช้ตะกร้าแทน');
       const cart = await prisma.cartItem.findMany({
@@ -65,64 +76,76 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'ไม่มีสินค้าในตะกร้า' }, { status: 400 });
       }
 
-      orderItems = cart.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.product.price,
-        size: item.size,
-      }));
+      orderItems = cart.map((item) => {
+        const priceObj = item.product.price as Record<string, number>;
+        const price = priceObj[item.size];
+        const unitPrice = item.unitPrice; // unitPrice ที่เก็บจากตะกร้า
+        const totalPrice = item.totalPrice; // totalPrice ที่เก็บจากตะกร้า
+
+        // เพิ่มการตรวจสอบกรณีที่ไม่ได้รับราคาไซส์
+        if (price === undefined || isNaN(price) || price <= 0) {
+          console.warn(`❌ ราคาไม่พบหรือไม่ถูกต้องสำหรับสินค้า ${item.productId} ขนาด ${item.size}. ราคา: ${price}`);
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            price: 0,  // กำหนดราคาเป็น 0 ถ้าราคาไม่พบหรือไม่ถูกต้อง
+            size: item.size,
+            unitPrice: 0, // unitPrice ที่ไม่ได้รับ
+            totalPrice: 0, // totalPrice ที่ไม่ได้รับ
+          };
+        }
+
+        console.log(`🛒 ราคาไซส์ ${item.size}: ${price}`);
+        totalAmount += totalPrice; // คำนวณยอดรวมในระหว่างนี้
+        return {
+          productId: item.productId,
+          quantity: item.quantity,
+          price: Math.floor(price),  // ปรับให้ราคาคำนวณเป็นจำนวนเต็ม
+          size: item.size,
+          unitPrice,
+          totalPrice,
+        };
+      });
       console.log(`✅ โหลดสินค้าจากตะกร้า ${orderItems.length} รายการ`);
+    } else {
+      // ถ้ามี items ส่งมาให้ใช้ข้อมูลใน `items`
+      orderItems.forEach((item) => {
+        totalAmount += item.totalPrice;  // เพิ่ม `totalPrice` ที่เก็บจากข้อมูล `items`
+      });
     }
 
-    console.log('🔍 ตรวจสอบสต็อกสินค้าก่อนสร้างคำสั่งซื้อ...');
-    const insufficientStock: string[] = [];
-    for (const item of orderItems) {
-      const product = await prisma.product.findUnique({ where: { id: item.productId } });
-      if (!product) {
-        console.warn(`❌ ไม่พบสินค้า ID: ${item.productId}`);
-        return NextResponse.json({
-          error: `❌ ไม่พบสินค้า productId: ${item.productId}`,
-        }, { status: 400 });
-      }
-
-      const stock: Record<string, number> = product.stock as any;
-      const size = item.size;
-
-      if (!size || stock[size] === undefined || stock[size] < item.quantity) {
-        insufficientStock.push(`${product.name} (${size}) เหลือ ${stock[size] || 0}`);
-      }
-    }
-
-    if (insufficientStock.length > 0) {
-      console.warn('❌ สินค้าไม่พอ:', insufficientStock);
-      return NextResponse.json({
-        error: `❌ สินค้าไม่พอ: ${insufficientStock.join(', ')}`,
-      }, { status: 400 });
-    }
-
-    const totalAmount = orderItems.reduce(
-      (sum: number, item: any) => sum + item.price * item.quantity,
-      0
-    );
+    // ตรวจสอบยอดรวมสุดท้าย
     console.log('💰 ยอดรวมที่ต้องชำระ:', totalAmount);
+    if (isNaN(totalAmount) || totalAmount <= 0) {
+      console.warn('❌ ยอดรวมไม่ถูกต้อง:', totalAmount);
+      return NextResponse.json({ error: 'ยอดรวมไม่ถูกต้อง' }, { status: 400 });
+    }
 
     console.log('🔁 เริ่มสร้างคำสั่งซื้อด้วย Transaction...');
     const result = await prisma.$transaction(async (tx) => {
       const createdOrder = await tx.order.create({
         data: {
-          userId,
-          totalAmount,
-          status: 'pending',
+          totalAmount, // ส่ง totalAmount ไปที่ฟิลด์นี้
+          status: 'pending', // สถานะคำสั่งซื้อเป็น "pending"
           orderItems: {
             create: orderItems.map((item: any) => ({
               productId: item.productId,
               quantity: item.quantity,
               price: item.price,
               size: item.size,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice, // เพิ่ม totalPrice
             })),
           },
+          user: {
+            connect: {
+              id: userId,
+            },
+          },
         },
-        include: { orderItems: true },
+        include: {
+          orderItems: true,
+        },
       });
 
       for (const item of orderItems) {
@@ -153,7 +176,6 @@ export async function POST(req: NextRequest) {
       { message: '✅ สร้างคำสั่งซื้อเรียบร้อยแล้ว', order: result },
       { status: 201 }
     );
-
   } catch (err: any) {
     console.error('❌ เกิดข้อผิดพลาดขณะสร้างคำสั่งซื้อ:', err);
     return NextResponse.json({ error: 'ไม่สามารถสร้างคำสั่งซื้อได้' }, { status: 500 });
