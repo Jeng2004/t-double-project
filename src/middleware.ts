@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 
 // ✅ Path ที่ต้องการป้องกัน
-const protectedPaths = ['/api/users', '/api/admin', '/api/profile'];
+const protectedPaths = ['/api/users', '/api/admin'];
 
 export function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl;

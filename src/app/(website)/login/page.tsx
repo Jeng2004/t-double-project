@@ -8,6 +8,53 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (loading) return;
+
+    setMessage('');
+
+    if (!email || !password) {
+      setMessage('❌ กรุณากรอกอีเมลและรหัสผ่าน');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        localStorage.setItem('userId', data.user.id);
+        console.log('✅ Login สำเร็จ:', data.user);
+        console.log('📦 userId ที่เก็บไว้:', localStorage.getItem('userId'));
+        setMessage('✅ เข้าสู่ระบบสำเร็จ');
+
+        // ✅ redirect ตาม role
+        if (data.user?.role === 'admin') {
+          router.push('/Order-admin');
+        } else {
+          router.push('/');
+        }
+      } else {
+        setMessage(`❌ ${data.error || 'เข้าสู่ระบบไม่สำเร็จ'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -35,18 +82,31 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <button className={styles.button} onClick={() => router.push('/')}>
-          SIGN IN
+        {message && <p className={styles.message}>{message}</p>}
+
+        <button
+          className={styles.button}
+          onClick={handleLogin}
+          disabled={loading}
+        >
+          {loading ? 'กำลังเข้าสู่ระบบ...' : 'SIGN IN'}
         </button>
-        <button className={styles.button} onClick={() => router.push('/forgotpassword')}>
-            FORGOT PASSWORD
+
+        <button
+          className={styles.button}
+          onClick={() => router.push('/forgotpassword')}
+        >
+          FORGOT PASSWORD
         </button>
       </div>
 
       <div className={styles.registerBox}>
         <h2 className={styles.title}>สมัครสมาชิก</h2>
         <p className={styles.subtitle}>ต้องการบัญชีใช่ไหม?</p>
-        <button className={styles.button} onClick={() => router.push('/register')}>
+        <button
+          className={styles.button}
+          onClick={() => router.push('/register')}
+        >
           PROCEED TO REGISTER
         </button>
       </div>

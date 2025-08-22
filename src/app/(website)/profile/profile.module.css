@@ -15,7 +15,8 @@
 
 .profileHeader {
   display: flex;
-  align-items: center;
+  flex-direction: row; /* ✅ ให้เรียงในแนวนอน */
+  align-items: center; /* จัดให้กลางในแนวตั้ง */
   gap: 15px;
   margin-bottom: 30px;
 }
@@ -25,6 +26,14 @@
   align-items: center;
   gap: 8px;
 }
+
+.profileImage {
+  width: 80px; /* ขนาดรูป */
+  height: 80px;
+  border-radius: 50%; /* ทำให้เป็นวงกลม */
+  object-fit: cover; /* ครอบตัดให้เต็มวง */
+}
+
 
 .name {
   font-weight: bold;
@@ -40,6 +49,7 @@
   border: 1px solid #ccc;
   padding: 20px;
   min-height: 200px;
+  width: 100%; /* ✅ ให้เต็ม */
 }
 
 .addressBox h4 {
@@ -50,4 +60,18 @@
   display: flex;
   justify-content: center;
   margin-top: 20px;
+}
+
+.logoutButton {
+  position: fixed;
+  bottom: 20px;
+  left: 70px;
+  background-color: #e53935;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }

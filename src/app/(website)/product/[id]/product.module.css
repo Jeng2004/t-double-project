@@ -1,0 +1,160 @@
+.container {
+  padding: 40px;
+  background: #fff;
+}
+
+.main {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 60px;
+}
+
+.imageColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.imageColumn img {
+  width: 550px;      /* 👈 ปรับขนาดเล็กลง (เดิมอาจจะใหญ่เกิน) */
+  height: 750px;     /* 👈 ทำให้ทุกภาพเท่ากัน */
+  object-fit: contain; /* 👈 ป้องกันภาพยืด/เบี้ยว */
+  background-color: #f9f9f9; /* 👈 เพิ่มพื้นหลังอ่อนๆ ถ้ารูปเล็กกว่า box */
+  border: 1px solid #eee; /* 👈 เพิ่มเส้นบางๆ ให้สวยขึ้น */
+  border-radius: 8px; /* 👈 มุมโค้งเล็กน้อย */
+}
+
+.detailColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.price {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.sizeSection,
+.colorSection {
+  font-size: 14px;
+}
+
+.options {
+  display: flex;
+  gap: 25px; /* 👈 ปรับขนาดระยะห่างระหว่างตัวอักษร */
+  margin-top: 5px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.colorList {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.sizeTable {
+  margin-top: 20px;
+}
+
+.sizeTable table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sizeTable th,
+.sizeTable td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: center;
+}
+
+.actions {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.primary,
+.secondary {
+  padding: 12px;
+  font-weight: bold;
+  background-color: black;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.secondary {
+  background-color: #333;
+}
+
+.relatedSection {
+  margin-top: 40px;
+}
+
+.relatedSection h3 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.relatedGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.relatedCard {
+  background-color: #f9f9f9;
+  padding: 10px;
+  text-align: center;
+}
+
+.viewMore {
+  margin-top: 10px;
+  background-color: black;
+  color: white;
+  padding: 8px;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.disabled {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.imageStage {
+  position: relative;
+  width: 420px;      /* ปรับเล็กลงจากเดิม */
+  max-width: 100%;
+  aspect-ratio: 1/1; /* ทำให้กรอบเป็นสี่เหลี่ยมจัตุรัสคงที่ */
+  margin: 0 auto;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+.stageImage {
+  object-fit: contain; /* รูปไม่เบี้ยว และเท่ากันทุกภาพ */
+  width: 100%;
+  height: 100%;
+}
+.hit { position: absolute; top: 0; bottom: 0; width: 50%; }
+.hitLeft { left: 0; }
+.hitRight { right: 0; }
+.sizeGuide { margin-top: 12px; max-width: 320px; height: auto; }
+.price, .options span {
+  font-variant-numeric: tabular-nums;
+}

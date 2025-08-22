@@ -11,26 +11,24 @@ datasource db {
 }
 
 model User {
-  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String?
-  email     String      @unique
+  email     String   @unique
   password  String
-  role      String      @default("user")  // role มีค่า default = user
-  createdAt DateTime    @default(now())
+  role      String   @default("user")
+  createdAt DateTime @default(now())
 
-  // :white_check_mark: เพิ่ม field ใหม่ให้ nullable
-  username  String?     @unique  // :green_circle: nullable
-  status    String?     // :green_circle: nullable
+  username  String?     // ✅ ลบ @unique
+  status    String?
   dept      String?
-  active    Boolean  @default(false) // :green_circle: เพิ่ม field active สำหรับอีเมลยืนยัน
-  otp         String?                 // :white_check_mark: เก็บ OTP
-  otpExpiry   DateTime?               // :white_check_mark: เวลา OTP หมดอายุ
-  cartItems CartItem[]  @relation("UserCartItems")
+  active    Boolean     @default(false)
+  otp         String?
+  otpExpiry   DateTime?
+  cartItems   CartItem[]  @relation("UserCartItems")
 
-  //profile
-  phone        String?    // ✅ เบอร์โทรศัพท์
-  address      String?    // ✅ ที่อยู่
-  profileImage String?    // ✅ URL รูปโปรไฟล์
+  phone        String?
+  address      String?
+  profileImage String?
 }
 
 
@@ -38,16 +36,15 @@ model Product {
   id          String      @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
-  price       Float
-  stock       Json                     // {"S": 10, "M": 20, ...}
-  imageUrls   String[]                 // array ของรูป
+  price       Json                      // ✅ เก็บราคาเป็น JSON {S,M,L,XL}
+  stock       Json                      // {"S": 10, "M": 20, ...}
+  imageUrls   String[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-
-
-
+  
   cartItems   CartItem[]  @relation("ProductCartItems")
 }
+
 
 model CartItem {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
