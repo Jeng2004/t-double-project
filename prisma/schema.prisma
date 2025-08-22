@@ -33,15 +33,14 @@ model Product {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
-  price       Json         // เปลี่ยนจาก Int[] เป็น Json สำหรับการเก็บราคาของแต่ละไซส์
+  price       Json         // เก็บราคาแต่ละไซส์ {"S": 100, "M": 200}
   stock       Json         // {"S": 10, "M": 20, ...}
   imageUrls   String[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  cartItems   CartItem[]   @relation("ProductCartItems")   // ใช้แค่การประกาศนี้
-  orderItems  OrderItem[]  @relation("ProductOrderItems")   // ความสัมพันธ์กับ OrderItem
+  cartItems   CartItem[]   @relation("ProductCartItems")
+  orderItems  OrderItem[]  @relation("ProductOrderItems")
 }
-
 
 model CartItem {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -49,34 +48,75 @@ model CartItem {
   productId  String   @db.ObjectId
   quantity   Int      @default(1)
   size       String
-  unitPrice  Int      // เพิ่มฟิลด์ unitPrice
-  totalPrice Int      // เพิ่มฟิลด์ totalPrice
+  unitPrice  Int
+  totalPrice Int
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
   user       User     @relation("UserCartItems", fields: [userId], references: [id])
   product    Product  @relation("ProductCartItems", fields: [productId], references: [id])
 }
 
-
-model Order {
+model OrderItem {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String       @db.ObjectId
-  user        User         @relation(fields: [userId], references: [id])
-  totalAmount Float
-  status      String       @default("pending") // 'pending' | 'paid' | 'shipped' | 'cancelled'
-  createdAt   DateTime     @default(now())
-  orderItems  OrderItem[]
+  orderId     String       @db.ObjectId
+  order       Order        @relation(fields: [orderId], references: [id]) 
+  productId   String       @db.ObjectId
+  product     Product      @relation("ProductOrderItems", fields: [productId], references: [id])
+  quantity    Int
+  price       Float
+  size        String
+  unitPrice   Float
+  totalPrice  Float
+
+  // 👉 สถานะสินค้า
+  status         String      @default("ปกติ")
+  returnQuantity Int?        @default(0)
+
+  // 👇 ความสัมพันธ์กับ ReturnItem
+  returnItems    ReturnItem[]
 }
 
-model OrderItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId   String   @db.ObjectId
-  order     Order    @relation(fields: [orderId], references: [id]) 
-  productId String   @db.ObjectId
-  product   Product  @relation("ProductOrderItems", fields: [productId], references: [id])
-  quantity  Int
-  price     Float
-  size      String
-  unitPrice Float     // เพิ่มฟิลด์ unitPrice
-  totalPrice Float    // เพิ่มฟิลด์ totalPrice
+model Order {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String           @db.ObjectId
+  user            User             @relation(fields: [userId], references: [id])
+  totalAmount     Float
+  status          String           @default("pending")
+  trackingId      String           @unique
+  createdAt       DateTime         @default(now())
+  createdAtThai   String?
+  orderItems      OrderItem[]
+
+  // ✅ ความสัมพันธ์กับ ReturnRequest
+  returnRequests  ReturnRequest[]
+}
+
+model ReturnRequest {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String       @db.ObjectId
+  order     Order        @relation(fields: [orderId], references: [id])
+  status    String       @default("pending") // pending, approved, rejected
+  reason    String?      // เหตุผลลูกค้า
+  adminNote String?      // เหตุผลแอดมิน
+  images    String[]     // เก็บ path รูป
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // ✅ relation กับ ReturnItem
+  items     ReturnItem[]
+}
+
+model ReturnItem {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  returnRequestId String        @db.ObjectId
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id])
+
+  orderItemId     String        @db.ObjectId
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
+
+  quantity        Int
+
+  // ✅ ห้ามคืนซ้ำสินค้าเดียวกัน
+  @@unique([orderItemId])
 }
