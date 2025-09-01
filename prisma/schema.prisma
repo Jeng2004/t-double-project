@@ -27,12 +27,16 @@ model User {
 
   // 🟢 ความสัมพันธ์กับ Order
   orders        Order[]
+
+  // 🟢 ความสัมพันธ์กับ SpecialOrder
+  specialOrders SpecialOrder[]   // 👈 เพิ่มบรรทัดนี้
 }
 
 model Product {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
+  category    String       // ✅ เพิ่มฟิลด์นี้
   price       Json         // เก็บราคาแต่ละไซส์ {"S": 100, "M": 200}
   stock       Json         // {"S": 10, "M": 20, ...}
   imageUrls   String[]
@@ -85,6 +89,7 @@ model Order {
   status          String           @default("pending")
   trackingId      String           @unique
   createdAt       DateTime         @default(now())
+  cancelReason  String?            // ✅ เพิ่มฟิลด์นี้
   createdAtThai   String?
   orderItems      OrderItem[]
 
@@ -119,4 +124,27 @@ model ReturnItem {
 
   // ✅ ห้ามคืนซ้ำสินค้าเดียวกัน
   @@unique([orderItemId])
+}
+
+model SpecialOrder {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName    String
+  lastName     String
+  phone        String
+  email        String
+  address      String
+  productType  String
+  model        String
+  quantity     Int
+  sizeLabel    String
+  chest        Float
+  length       Float
+  notes        String?
+  status       String   @default("pending")
+  cancelReason String?
+  createdAt    DateTime @default(now())
+  createdAtThai String?  // ✅ เก็บเวลาไทยลง DB
+
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
 }

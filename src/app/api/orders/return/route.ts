@@ -75,6 +75,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ไม่พบคำสั่งซื้อ" }, { status: 404 });
     }
 
+    // 🚨 ตรวจสอบว่า order ถูกจัดส่งสำเร็จหรือยัง
+    if (order.status !== "จัดส่งสินค้าสำเร็จเเล้ว") {
+      return NextResponse.json(
+        { error: "ไม่สามารถส่งคำขอคืนสินค้าได้ เนื่องจากออเดอร์ยังไม่ได้จัดส่งสำเร็จ" },
+        { status: 400 }
+      );
+    }
+
     // ✅ ตรวจสอบสินค้าและจำนวน
     for (const item of items) {
       const orderItem = order.orderItems.find((oi) => oi.id === item.orderItemId);
@@ -124,7 +132,7 @@ export async function POST(req: NextRequest) {
         orderId,
         reason: reason ?? "",
         images: savedPaths,
-        status: "รอดำเนินการ",
+        status: "รอดำเนินการ", // 👈 เริ่มต้นด้วย "รอดำเนินการ"
         items: {
           create: items.map((item) => ({
             orderItemId: item.orderItemId,
