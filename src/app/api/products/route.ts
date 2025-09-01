@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
     const { fields, files } = await parseFormData(req);
 
     const name = String(fields.name || '');
+    const category = String(fields.category || 'Uncategorized'); // ✅ เพิ่มหมวดหมู่
 
     if (!name) {
       return NextResponse.json({ error: 'Missing product name' }, { status: 400 });
@@ -107,6 +108,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         description,
+        category, // ✅ บันทึก category ลง DB
         stock,
         price,
         imageUrls
