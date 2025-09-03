@@ -8,37 +8,47 @@ const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export async function GET() {
-    try {
-        await prisma.$connect();
+  try {
+    await prisma.$connect();
 
-        const users = await prisma.user.findMany({
-            select: {
-                id: true,
-                username: true,
-                name: true,
-                email: true,
-                role: true,
-                status: true,
-                dept: true,
-                createdAt: true
-            }
-        });
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        dept: true,
+        createdAt: true,
+        phone: true,
+        address: true,
+      },
+    });
 
-        // 🟢 ใส่ค่า default ถ้า field หาย
-        const usersWithDefaults = users.map(user => ({
-            ...user,
-            username: user.username || "unknown",
-            status: user.status || "active"
-        }));
+    // 🟢 ใส่ค่า default ถ้า field หาย
+    const usersWithDefaults = users.map((user) => ({
+      ...user,
+      username: user.username || 'unknown',
+      status: user.status || 'active',
+    }));
 
-        return NextResponse.json(usersWithDefaults, { status: 200 });
-    } catch (error: any) {
-        console.error('❌ GET users error:', error.message, error.stack);
-        return NextResponse.json(
-            { error: `Failed to fetch users: ${error.message}` },
-            { status: 500 }
-        );
-    } finally {
-        await prisma.$disconnect();
+    return NextResponse.json(usersWithDefaults, { status: 200 });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('❌ GET users error:', error.message, error.stack);
+      return NextResponse.json(
+        { error: `Failed to fetch users: ${error.message}` },
+        { status: 500 }
+      );
     }
+
+    console.error('❌ GET users unknown error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch users: Unknown error' },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }

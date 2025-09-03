@@ -1,3 +1,4 @@
+// src/app/(website)/profile/page.tsx
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -6,6 +7,7 @@ import Navbar from '../components/Navbar';
 import Image from 'next/image';
 import TrackOrders from '../components/Track-orders';
 import EditProfile from '../components/editprofile';
+import { getUserIdForFrontend } from '@/lib/get-user-id';
 
 interface User {
   name: string | null;
@@ -23,9 +25,9 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const userId = localStorage.getItem('userId');
+    const userId = getUserIdForFrontend();
     if (!userId) {
-      console.error('❌ ไม่พบ userId ใน localStorage');
+      console.error('❌ ไม่พบ userId');
       return;
     }
 
@@ -51,7 +53,7 @@ export default function ProfilePage() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const userId = localStorage.getItem('userId');
+    const userId = getUserIdForFrontend();
     if (!userId) return;
 
     const formData = new FormData();
@@ -69,7 +71,7 @@ export default function ProfilePage() {
   };
 
   const handleUpdateAddress = async () => {
-    const userId = localStorage.getItem('userId');
+    const userId = getUserIdForFrontend();
     if (!userId) return;
 
     const formData = new FormData();
@@ -133,17 +135,25 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ติดตามคำสั่งซื้อฝั่งขวา */}
         <div className={styles.right}>
-          <TrackOrders />
+          <div className={styles.ordersWrapper}>
+            <h4 className={styles.ordersTitle}>ติดตามการสั่งซื้อ</h4>
+            <div className={styles.ordersScroll}>
+              <TrackOrders />
+            </div>
+          </div>
         </div>
       </div>
 
-      <button className={styles.logoutButton} onClick={async () => {
-        await fetch('/api/logout', { method: 'POST' });
-        localStorage.removeItem('userId');
-        window.location.href = '/login';
-      }}>
+
+      <button
+        className={styles.logoutButton}
+        onClick={async () => {
+          await fetch('/api/logout', { method: 'POST' });
+          localStorage.removeItem('userId');
+          window.location.href = '/login';
+        }}
+      >
         LOGOUT
       </button>
 

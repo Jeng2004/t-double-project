@@ -1,184 +1,55 @@
-/* พื้นหลังหน้าและหัวเรื่อง */
-.container {
-  padding: 40px;
-  background-color: #fff;
-}
+.container { padding: 40px; background: #fff; }
+.pageTitle { font-weight: 800; font-size: 20px; margin-bottom: 16px; color: #222; }
 
-.pageTitle {
-  font-weight: bold;
-  font-size: 20px;
-  margin-bottom: 20px;
-  color: #444;
-}
-
-/* =========================
-   Header ตาราง (5 คอลัมน์)
-   ชื่อ | Size | จำนวน | ราคา | จัดการ
-   ========================= */
+/* Header: 4 คอลัมน์ */
 .tableHeader {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
-  background-color: #ddd;
-  padding: 12px 20px; /* เว้นซ้าย/ขวาให้เป็นมาตรฐานเดียวกับแถว */
-  font-weight: bold;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  background: #eee;
+  padding: 12px 20px;
+  font-weight: 700;
   color: #333;
+  border-radius: 8px;
   margin-bottom: 10px;
-  border-radius: 4px;
 }
+.colName, .colCategory, .colSizeRange, .colEdit { display: flex; align-items: center; }
 
-.colName,
-.colSize,
-.colQty,
-.colPrice,
-.colEdit {
-  display: flex;
-  align-items: center;
-}
-
-/* =========================
-   Card สินค้า: ใช้ 5 คอลัมน์ให้ตรงกับ header
-   ========================= */
+/* แถวสินค้า */
 .card {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr; /* ชื่อ | Size | จำนวน | ราคา | จัดการ */
-  border: 1px solid #ccc;
-  margin-bottom: 20px;
-  border-radius: 6px;
-  background-color: #fafafa;
-  overflow: hidden;
-}
-
-/* คอลัมน์ที่ 1: ข้อมูลสินค้า (รูป + ชื่อ) */
-.productInfo {
-  grid-column: 1 / span 1;      /* อยู่คอลัมน์ "ชื่อ" */
-  display: flex;
+  grid-template-columns: 2fr 1fr 1fr 1fr; /* ให้ตรงกับ header */
   align-items: center;
-  gap: 15px;
-  padding: 20px;
-  border-right: 1px solid #ddd;
+  padding: 12px 20px;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  background: #fafafa;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
 }
 
-.name {
-  font-weight: bold;
-  margin: 0;
-}
-
-.price {
-  font-size: 14px;
-  color: #444;
-  margin-top: 5px;
-}
-
-/* คอลัมน์ 2–5: ตารางไซส์ */
-.sizeTable {
-  grid-column: 2 / span 4;      /* ตรงกับคอลัมน์ Size..จัดการ */
-  display: block;
-}
-
-/* แต่ละแถวภายในตารางไซส์ = 4 คอลัมน์ (Size | จำนวน | ราคา | จัดการ) */
-.sizeRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  align-items: center;
-  padding: 12px 20px;           /* ให้เท่ากับ header */
-  border-bottom: 1px solid #eee;
-}
-
-.size {
-  font-weight: bold;
-}
-
-.qty {
-  color: #333;
-}
-
-.outOfStock {
-  color: red;
-  font-weight: bold;
-}
-
-
-.colPrice {
-  display: flex;
-  align-items: center;
-
-}
-
-/* คอลัมน์จัดการ: ปุ่มอยู่ขวาสุดและจัดแนวให้ตรงกับ header */
-.editSingle {
-  display: flex;
-  justify-content: flex-end;   /* ชิดขวาในคอลัมน์จัดการ */
-  align-items: center;         /* กลางแนวตั้ง; ใช้ flex-start ถ้าอยากชิดบน */
-  gap: 8px;
-  min-height: 32px;
-}
-
-.editSingle button {
-  background-color: black;
-  color: white;
-  border: none;
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-/* รูปสินค้า */
-.imageContainer {
-  position: relative;
-  width: 160px;
-  height: 200px;
-  overflow: hidden;
-  border: 2px solid #ccc;
-  cursor: pointer;
-}
-
+/* คอลัมน์ 1: รูป + ชื่อ */
+.productInfo { display: flex; align-items: center; gap: 16px; }
+.imageBox { position: relative; width: 140px; height: 140px; cursor: pointer; }
 .image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 8px; border: 1px solid #ddd; background: #fff;
+}
+.name { font-weight: 700; color: #111; font-size: 14px; margin: 0; }
+
+/* คอลัมน์ 2–3 */
+.category, .sizeRange { font-size: 14px; color: #444; }
+.sizeRange { font-weight: 600; }
+
+/* คอลัมน์ 4: จัดการสินค้า → ปุ่มชิดซ้าย (เพื่อให้อยู่ใต้หัวคอลัมน์พอดี) */
+.editCol { display: flex; justify-content: flex-start; }
+.editCol button {
+  background: #000; color: #fff; border: none;
+  padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer;
 }
 
-/* ซ่อนถ้ามีปุ่มลูกศรเก่า */
-.arrowButtonContainer {
-  display: none;
-}
-
-/* ปุ่มลบ (หากต้องการสไตล์เฉพาะ) */
-.deleteBtn {}
-
-/* =========================
-   Responsive
-   ========================= */
-@media (max-width: 920px) {
-  .tableHeader,
-  .card {
-    grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr;
-  }
-}
-
-@media (max-width: 700px) {
-  /* ในจอแคบมากให้ซ้อนแนวตั้ง */
-  .tableHeader {
-    display: none; /* ซ่อน header เพื่อความอ่านง่ายบนมือถือมาก ๆ */
-  }
-  .card {
-    grid-template-columns: 1fr;
-  }
-  .productInfo {
-    grid-column: 1 / -1;
-    border-right: none;
-    border-bottom: 1px solid #ddd;
-  }
-  .sizeTable {
-    grid-column: 1 / -1;
-  }
-  .sizeRow {
-    grid-template-columns: 1fr 1fr;
-    row-gap: 8px;
-  }
-  .priceCol,
-  .editSingle {
-    justify-content: flex-start;
-    text-align: left;
-  }
+/* Responsive */
+@media (max-width: 720px) {
+  .tableHeader { display: none; }
+  .card { grid-template-columns: 1fr; row-gap: 8px; }
+  .editCol { justify-content: flex-start; }
 }

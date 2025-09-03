@@ -18,12 +18,12 @@
 }
 
 .imageColumn img {
-  width: 550px;      /* 👈 ปรับขนาดเล็กลง (เดิมอาจจะใหญ่เกิน) */
-  height: 750px;     /* 👈 ทำให้ทุกภาพเท่ากัน */
-  object-fit: contain; /* 👈 ป้องกันภาพยืด/เบี้ยว */
-  background-color: #f9f9f9; /* 👈 เพิ่มพื้นหลังอ่อนๆ ถ้ารูปเล็กกว่า box */
-  border: 1px solid #eee; /* 👈 เพิ่มเส้นบางๆ ให้สวยขึ้น */
-  border-radius: 8px; /* 👈 มุมโค้งเล็กน้อย */
+  width: 550px;
+  height: 750px;
+  object-fit: contain;
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 8px;
 }
 
 .detailColumn {
@@ -41,36 +41,130 @@
 .price {
   font-size: 20px;
   margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
-.sizeSection,
-.colorSection {
+/* ส่วนเลือกไซส์ */
+.sizeSection {
   font-size: 14px;
 }
 
 .options {
   display: flex;
-  gap: 25px; /* 👈 ปรับขนาดระยะห่างระหว่างตัวอักษร */
-  margin-top: 5px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.colorList {
-  display: flex;
   gap: 10px;
-  margin-top: 5px;
+  flex-wrap: wrap;
+  margin-top: 8px;
 }
 
+.sizeBtn {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  transition: all .15s ease-in-out;
+}
+
+.sizeBtn:hover:not(:disabled) { background: #efefef; }
+.sizeBtnActive { border-color: #000; background: #000; color: #fff; }
+.sizeBtn:disabled { opacity: .45; cursor: not-allowed; }
+
+
+/* กล่องจำนวน */
+.qtyRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 6px;
+}
+
+.quantityBox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quantityBox button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #f9f9f9;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.quantityBox span {
+  min-width: 28px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.qtyHint {
+  color: #666;
+  font-size: 13px;
+}
+
+/* Accordion */
+.accordion {
+  border-top: 1px solid #eee;
+}
+.accordion:first-of-type {
+  margin-top: 10px;
+}
+
+.accordionHeader {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 14px;
+  text-align: left;
+}
+
+.accordionCaret {
+  transition: transform 0.2s ease;
+  font-size: 14px;
+}
+.open .accordionCaret {
+  transform: rotate(180deg);
+}
+
+.accordionContent {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+.open .accordionContent {
+  max-height: 800px;
+}
+.accordionInner {
+  padding: 6px 0 12px;
+  color: #333;
+}
+
+/* ตารางขนาด */
 .sizeTable {
-  margin-top: 20px;
+  margin-top: 0;
 }
-
 .sizeTable table {
   width: 100%;
   border-collapse: collapse;
 }
-
 .sizeTable th,
 .sizeTable td {
   border: 1px solid #ccc;
@@ -78,6 +172,45 @@
   text-align: center;
 }
 
+/* การแสดงรูป */
+.imageStage {
+  position: relative;
+  width: 420px;
+  max-width: 100%;
+  aspect-ratio: 1/1;
+  margin: 0 auto;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.stageImage {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+}
+
+.hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+}
+.hitLeft {
+  left: 0;
+}
+.hitRight {
+  right: 0;
+}
+
+.sizeGuide {
+  margin-top: 12px;
+  max-width: 320px;
+  height: auto;
+}
+
+/* ปุ่มซื้อ/เพิ่มตะกร้า */
 .actions {
   margin-top: 20px;
   display: flex;
@@ -99,62 +232,28 @@
   background-color: #333;
 }
 
-.relatedSection {
-  margin-top: 40px;
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.relatedSection h3 {
-  font-size: 18px;
-  margin-bottom: 20px;
+.selectedPrice {
+  margin-top: 8px;
+  font-weight: 800;
+  font-size: 16px;
+  color: #111;
+  font-variant-numeric: tabular-nums;
 }
 
-.relatedGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 20px;
-}
-
-.relatedCard {
-  background-color: #f9f9f9;
-  padding: 10px;
-  text-align: center;
-}
-
-.viewMore {
-  margin-top: 10px;
-  background-color: black;
-  color: white;
-  padding: 8px;
-  border: none;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.disabled {
-  opacity: 0.4;
-  text-decoration: line-through;
-}
-
-.imageStage {
-  position: relative;
-  width: 420px;      /* ปรับเล็กลงจากเดิม */
-  max-width: 100%;
-  aspect-ratio: 1/1; /* ทำให้กรอบเป็นสี่เหลี่ยมจัตุรัสคงที่ */
-  margin: 0 auto;
-  cursor: pointer;
-  background: #fff;
+/* รูป size guide ด้านบน */
+.sizeGuideBottom {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  display: block;
+  margin: 12px auto 0;
   border: 1px solid #eee;
   border-radius: 8px;
-}
-.stageImage {
-  object-fit: contain; /* รูปไม่เบี้ยว และเท่ากันทุกภาพ */
-  width: 100%;
-  height: 100%;
-}
-.hit { position: absolute; top: 0; bottom: 0; width: 50%; }
-.hitLeft { left: 0; }
-.hitRight { right: 0; }
-.sizeGuide { margin-top: 12px; max-width: 320px; height: auto; }
-.price, .options span {
-  font-variant-numeric: tabular-nums;
+  background: #fff;
 }

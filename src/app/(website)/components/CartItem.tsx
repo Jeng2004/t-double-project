@@ -7,10 +7,15 @@ type CartItemProps = {
   name: string;
   size: string;
   code: string;
-  price: number;
+  price: number;   // unit price
   quantity: number;
   image: string;
   color: string;
+  stockLeft?: number;   
+  onInc?: () => void;
+  onDec?: () => void;
+  onRemove?: () => void;
+  disabled?: boolean;
 };
 
 export default function CartItem({
@@ -21,6 +26,11 @@ export default function CartItem({
   quantity,
   image,
   color,
+  stockLeft, 
+  onInc,
+  onDec,
+  onRemove,
+  disabled,
 }: CartItemProps) {
   return (
     <div className={styles.cartItem}>
@@ -29,18 +39,18 @@ export default function CartItem({
         <div>
           <div className={styles.itemName}>{name}</div>
           <div className={styles.itemDetail}>Size: {size}</div>
-          <div className={styles.itemDetail}>คลัง: {code}</div>
-          <div className={styles.itemDetail}>สี: {color}</div> {/* ✅ เพิ่มบรรทัดนี้ */}
+          <div className={styles.itemDetail}>คงเหลือ: {stockLeft !== undefined ? stockLeft : '-'}</div>
+
         </div>
       </div>
 
       <div className={styles.itemPrice}>{price.toFixed(2)}฿</div>
 
       <div className={styles.qtyControl}>
-        <button>-</button>
+        <button onClick={onDec} disabled={disabled || quantity <= 1}>−</button>
         <span>{quantity}</span>
-        <button>+</button>
-        <button className={styles.trash}>🗑</button>
+        <button onClick={onInc} disabled={disabled}>+</button>
+        <button className={styles.trash} onClick={onRemove} disabled={disabled} title="ลบสินค้า">🗑</button>
       </div>
     </div>
   );
