@@ -1,45 +1,172 @@
+/* src/app/(website)/components/Track-orders.module.css */
+
 .title {
-  margin-bottom: 20px;
-  font-size: 16px;
-  font-weight: bold;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #222;
 }
 
+/* กล่อง Order */
 .orderList {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+}
+
+.orderCard {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+  overflow: hidden;
+}
+
+/* Header */
+.orderHeader {
+  padding: 14px 16px 10px;
+  background: #fafafa;
+  border-bottom: 1px solid #eee;
+}
+
+.headerRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.headerLabel {
+  color: #666;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.headerValue {
+  color: #111;
+  font-weight: 700;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerDate {
+  font-size: 12px;
+  color: #666;
+}
+
+/* รายการสินค้าในออเดอร์ */
+.items {
+  padding: 10px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .orderItem {
-  display: flex;
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
   align-items: center;
-  gap: 15px;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 10px;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f2f2f2;
+}
+.orderItem:last-child {
+  border-bottom: none;
 }
 
+.thumb {
+  border-radius: 8px;
+  border: 1px solid #eee;
+  background: #fff;
+}
+
+.meta { min-width: 0; }
+
 .productName {
-  font-weight: bold;
+  font-weight: 700;
   margin: 0;
+  font-size: 15px;
+  color: #222;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .productDetail {
   font-size: 13px;
-  color: #555;
+  color: #666;
 }
 
 .price {
-  font-weight: bold;
-  margin-left: auto;
-  padding-right: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding-left: 8px;
+  color: #111;
 }
 
-.statusPending {
-  color: red;
-  font-size: 13px;
+/* Badge สถานะ */
+.status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.statusSuccess {
-  color: limegreen;
-  font-size: 13px;
+.statusPending {         /* รอดำเนินการ */
+  background: #fff1f0;
+  color: #d4380d;
+  border: 1px solid #ffd8bf;
+}
+
+.statusPreparing {       /* กำลังเตรียมสินค้า */
+  background: #fffbe6;
+  color: #b36b00;
+  border: 1px solid #ffe58f;
+}
+
+.statusShipping {        /* กำลังจัดส่ง */
+  background: #e6f4ff;
+  color: #0958d9;
+  border: 1px solid #bae0ff;
+}
+
+.statusSuccess {         /* จัดส่งสำเร็จ */
+  background: #f6ffed;
+  color: #389e0d;
+  border: 1px solid #b7eb8f;
+}
+
+.statusCancel {          /* ยกเลิก */
+  background: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ffa39e;
+}
+
+/* responsive เล็กน้อย */
+@media (max-width: 560px) {
+  .orderItem {
+    grid-template-columns: 50px 1fr auto;
+    gap: 10px;
+  }
+  .price { font-size: 13px; }
+}
+
+.productExtraLink {
+  margin-top: 4px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0969da;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.productExtraLink:hover {
+  text-decoration: underline;
 }

@@ -1,0 +1,104 @@
+.page { background: #f5f5f5; min-height: 100vh; }
+.container { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; background: #fff; }
+
+.title { font-size: 24px; font-weight: 800; margin: 8px 0 12px; color: #222; }
+.hr { height: 1px; background: #eee; margin: 12px 0 16px; }
+
+.section { margin: 22px 0; }
+.sectionTitle { font-size: 16px; font-weight: 800; margin: 0 0 12px; color: #222; }
+
+/* Label ซ้าย / Value ขวา */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  row-gap: 12px;
+  column-gap: 12px;
+  margin-bottom: 16px;
+}
+.infoLabel { color: #666; font-weight: 600; }
+.infoValue { color: #111; font-weight: 800; text-align: right; }
+
+/* รายการสินค้า */
+.itemRow {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fafafa;
+}
+.thumbBox { display: flex; align-items: center; justify-content: center; }
+.thumb { border-radius: 10px; border: 1px solid #eee; background: #fff; }
+.itemMeta { min-width: 0; }
+.itemName { font-weight: 800; color: #111; margin: 0 0 6px; }
+.itemSub { color: #666; font-size: 13px; }
+.itemPrice { font-weight: 800; color: #111; }
+
+/* สถานะ */
+.stateRow {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: center;
+  margin-top: 16px;
+}
+.stateLabel { color: #666; font-weight: 600; }
+.badge {
+  justify-self: end;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+.badgePending { background: #fff1f0; color: #d4380d; border-color: #ffd8bf; }
+.badgePreparing { background: #fffbe6; color: #b36b00; border-color: #ffe58f; }
+.badgeShipping { background: #e6f4ff; color: #0958d9; border-color: #bae0ff; }
+.badgeSuccess { background: #f6ffed; color: #389e0d; border-color: #b7eb8f; }
+.badgeCancel { background: #fff1f0; color: #cf1322; border-color: #ffa39e; }
+
+/* ฟอร์ม */
+.formGroup { margin-top: 18px; }
+.formLabel { display: block; color: #333; font-weight: 700; margin-bottom: 8px; }
+.selectWrap { position: relative; width: 100%; max-width: 460px; }
+.select {
+  appearance: none;
+  width: 100%;
+  padding: 10px 36px 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-weight: 600;
+}
+.caret {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: #666; pointer-events: none;
+}
+
+/* ปุ่มและหมายเหตุ */
+.submitBtn {
+  margin-top: 18px;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 22px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.submitBtn:disabled { opacity: .6; cursor: not-allowed; }
+
+.note { color: #777; font-size: 12px; margin-top: 10px; }
+
+.error { color: #c00; margin: 12px 0; }
+
+/* Responsive */
+@media (max-width: 720px) {
+  .infoGrid { grid-template-columns: 1fr; }
+  .infoValue { text-align: left; }
+  .itemRow { grid-template-columns: 100px 1fr; }
+  .stateRow { grid-template-columns: 1fr; }
+  .badge { justify-self: start; }
+}

@@ -1,11 +1,16 @@
 .container {
-    display: flex;
-    gap: 200px;
-    padding: 40px;
-    background-color: #f0f4ff;
-    min-height: 100vh;
-    box-sizing: border-box;
-  }
+  display: flex;
+  gap: 200px;
+  padding: 40px;
+  background-image: url('/bg-login.png');
+  background-size: 1050px auto;   /* 👈 กว้างคงที่ 500px, สูงปรับตามสัดส่วน */
+  background-position: right center; 
+  background-repeat: no-repeat;
+
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
   
   .loginBox {
     width: 50%;
