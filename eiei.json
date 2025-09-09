@@ -1,0 +1,19 @@
+{
+  "message": "Shirt added",
+  "product": {
+    "id": "clxyz12345",
+    "name": "เสื้อยืดทดสอบ",
+    "description": "เสื้อยืดคอกลมใส่สบาย",
+    "category": "T-Shirt",
+    "stock": { "S": 20, "M": 15, "L": 10, "XL": 5 },
+    "price": { "S": 199, "M": 219, "L": 239, "XL": 259 },
+    "colors": ["red", "blue"],
+    "stockPerColor": {
+      "red": { "S": 10, "M": 5, "L": 2, "XL": 1 },
+      "blue": { "S": 8, "M": 6, "L": 3, "XL": 0 },
+      "white" : { "S": 2, "M": 4, "L": 5, "XL": 4 }
+    },
+    "imageUrls": ["/uploads/abc123.jpg"],
+    "createdAt": "2025-09-08T13:45:22.000Z"
+  }
+}
