@@ -22,7 +22,7 @@
 }
 
 .actionBtn {
-  background-color: #007bff;
+  background-color: #777171;
   color: white;
   padding: 6px 12px;
   border: none;
@@ -32,10 +32,75 @@
 }
 
 .deleteBtn {
-  background-color: #dc3545;
+  background-color: #f15b6a;
   color: white;
   padding: 6px 12px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
 }
+
+.linkBtn {
+  all: unset;
+  cursor: pointer;
+  color: #959595;
+  font-weight: 700;
+}
+.linkBtn:hover {
+  text-decoration: underline;
+}
+
+/* C:\Users\yodsa\t-double-project\src\app\(website)\Order-admin\Order-admin.module.css */
+
+/* ปุ่มเปิด/ปิดรายละเอียดด้านหน้า Order ID */
+.expandBtn {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+/* ตัวหนังสือจาง ๆ ใช้บอกอีเมล/ชื่อ */
+.muted {
+  color: #777;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* แถวรายละเอียด (อยู่ถัดจากแถว order นั้นทันที) */
+.detailRow td {
+  background: #fafafa;
+  padding: 12px 16px;
+}
+
+/* ตารางรายการสินค้าภายในรายละเอียด */
+.itemsWrap {
+  display: grid;
+  row-gap: 8px;
+}
+
+.itemsHeader,
+.itemRow {
+  display: grid;
+  grid-template-columns: 3fr 80px 90px 140px 140px;
+  column-gap: 10px;
+  align-items: center;
+}
+
+.itemsHeader {
+  font-weight: 700;
+  color: #333;
+  border-bottom: 1px solid #e7e7e7;
+  padding-bottom: 6px;
+}
+
+.itemRow {
+  padding: 6px 0;
+  border-bottom: 1px dashed #eee;
+}
+.itemRow:last-child { border-bottom: none; }
+
+.itemName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.orderId { font-weight: 700; margin-left: 2px; }
