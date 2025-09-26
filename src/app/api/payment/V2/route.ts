@@ -1,1 +1,0 @@
-import { middleware } from "@/lib/middleware";

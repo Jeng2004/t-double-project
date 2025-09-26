@@ -112,9 +112,9 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       };
     }
 
-    const imageFiles = Array.isArray(files.image) ? files.image : files.image ? [files.image] : [];
+    const imageFiles = Array.isArray((files as any).image) ? (files as any).image : (files as any).image ? [(files as any).image] : [];
     if (imageFiles.length > 0) {
-      updateData.imageUrls = imageFiles.map((file) => `/uploads/${path.basename(file.filepath)}`);
+      updateData.imageUrls = imageFiles.map((file: any) => `/uploads/${path.basename(file.filepath)}`);
     }
 
     const updatedProduct = await prisma.product.update({
@@ -159,9 +159,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       };
     }
 
-    const imageFiles = Array.isArray(files.image) ? files.image : files.image ? [files.image] : [];
+    const imageFiles = Array.isArray((files as any).image) ? (files as any).image : (files as any).image ? [(files as any).image] : [];
     if (imageFiles.length > 0) {
-      updateData.imageUrls = imageFiles.map((file) => `/uploads/${path.basename(file.filepath)}`);
+      updateData.imageUrls = imageFiles.map((file: any) => `/uploads/${path.basename(file.filepath)}`);
     }
 
     const updatedProduct = await prisma.product.update({

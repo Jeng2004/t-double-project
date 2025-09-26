@@ -4,24 +4,33 @@ import nodemailer from "nodemailer";
 
 const prisma = new PrismaClient();
 
-const allowedStatus = ["ยกเลิก", "รอดำเนินการ", "กำลังดำเนินการจัดเตรียมสินค้า", "กำลังดำเนินการจัดส่งสินค้า", "จัดส่งสินค้าสำเร็จเเล้ว"] as const;
+const allowedStatus = [
+  "ยกเลิก",
+  "รอดำเนินการ",
+  "กำลังดำเนินการจัดเตรียมสินค้า",
+  "กำลังดำเนินการจัดส่งสินค้า",
+  "จัดส่งสินค้าสำเร็จเเล้ว",
+] as const;
 type OrderStatus = (typeof allowedStatus)[number];
 
 // สร้าง transporter สำหรับส่งอีเมล
 const transporter = nodemailer.createTransport({
   service: "gmail", // หรือ smtp อื่น ๆ
   auth: {
-    user: process.env.EMAIL_USER, // อีเมลของคุณ
-    pass: process.env.EMAIL_PASS, // App password (ไม่ใช่ password จริง)
+    user: process.env.EMAIL_USER, // Gmail ของคุณ
+    pass: process.env.EMAIL_PASS, // App password (ไม่ใช่รหัสจริง)
   },
 });
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = params.id;
+    // ✅ ต้อง await ก่อน
+    const { id } = await context.params;
+    const orderId = id;
+
     const { status } = await req.json();
 
     if (!status || !allowedStatus.includes(status)) {
@@ -31,7 +40,7 @@ export async function PATCH(
       );
     }
 
-    // หา order พร้อม user
+    // 🔎 หา order พร้อม user
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: { user: true }, // ต้องมี relation order → user
@@ -47,7 +56,7 @@ export async function PATCH(
       include: { user: true },
     });
 
-    // ส่งอีเมลแจ้งเตือน
+    // 📧 ส่งอีเมลแจ้งเตือน
     if (updatedOrder.user?.email) {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -59,7 +68,11 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { message: "✅ อัปเดตสถานะสำเร็จ และส่งการเเจ้งเตือนไปที่อีเมลแล้ว", order: updatedOrder },
+      {
+        message:
+          "✅ อัปเดตสถานะสำเร็จ และส่งการเเจ้งเตือนไปที่อีเมลแล้ว",
+        order: updatedOrder,
+      },
       { status: 200 }
     );
   } catch (err) {
