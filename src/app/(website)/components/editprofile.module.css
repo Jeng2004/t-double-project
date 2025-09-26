@@ -38,7 +38,44 @@
 }
 
 .avatar {
-  margin-bottom: 30px;
+  margin-bottom: 20px;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+}
+
+.avatarPick {
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.avatarImg {
+  border-radius: 50%;   /* ✅ วงกลม */
+  width: 100px;
+  height: 100px;
+  object-fit: cover;    /* ✅ ครอบสัดส่วน */
+}
+
+.avatarHint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 6px;
+}
+
+.deleteBtn {
+  background: #fff;
+  color: #e53935;
+  border: 1px solid #e53935;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.deleteBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .field {
@@ -77,3 +114,56 @@
   border-radius: 6px;
   cursor: pointer;
 }
+
+
+.textInput {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.readonlyBox {
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #fafafa;
+}
+
+
+.uploadBtn {
+  display: inline-block;
+  background: #0070f3;
+  color: #fff;
+  padding: 6px 12px;
+  margin-top: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.removeBtn {
+  display: inline-block;
+  background: #e53935;
+  color: #fff;
+  padding: 6px 12px;
+  margin-top: 8px;
+  margin-left: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.readonly {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #f9f9f9;
+}
+

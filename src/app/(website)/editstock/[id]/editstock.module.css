@@ -1,0 +1,144 @@
+.container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  background: #fff;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 900;
+  color: #111;
+  margin: 0 0 6px;
+}
+
+.categoryText {
+  margin: 0 0 24px;
+  color: #666;
+  font-size: 13px;
+}
+
+/* รูปตัวอย่างสองรูป */
+.previewRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  margin-bottom: 28px;
+}
+
+.previewBox {
+  background: #f6f6f6;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 380px;
+}
+
+.previewImg {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ตาราง Variant */
+.tableSection {
+  margin-top: 10px;
+}
+
+.sectionTitle {
+  margin: 0 0 10px;
+  font-weight: 900;
+  color: #222;
+  font-size: 16px;
+}
+
+.tableWrap {
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table thead tr {
+  background: #f0f0f0;
+}
+
+.table th,
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: left;
+  color: #222;
+}
+
+.table th {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.cellCenter {
+  text-align: center;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fafafa;
+}
+
+.smallBtn {
+  background: #f3f3f3;
+  border: 1px solid #e5e5e5;
+  color: #222;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ปุ่มล่างขวา */
+.footerBtns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 14px;
+}
+
+.primaryBtn {
+  background: #000;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.secondaryBtn {
+  background: #ededed;
+  border: none;
+  color: #222;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 820px) {
+  .previewRow {
+    grid-template-columns: 1fr;
+  }
+}

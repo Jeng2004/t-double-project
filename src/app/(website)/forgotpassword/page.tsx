@@ -7,6 +7,33 @@ import { useRouter } from 'next/navigation';
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const router = useRouter();
+  const handleReset = async () => {
+    if (!email) {
+      alert('กรุณากรอกอีเมล');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/reset_password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(data.message); // ✅ แจ้งผลลัพธ์
+      } else {
+        alert(`❌ ${data.error || 'เกิดข้อผิดพลาด'}`);
+      }
+    } catch (err) {
+      alert('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  };
+
 
   return (
     <div className={styles.container}>
@@ -25,7 +52,7 @@ export default function ForgotPasswordPage() {
           onChange={(e) => setEmail(e.target.value)}
         />
 
-        <button className={styles.button}>RESET PASSWORD</button>
+        <button className={styles.button} onClick={handleReset}>RESET PASSWORD</button>
         <button className={styles.button} onClick={() => router.push('/login')}>
           CANCEL
         </button>

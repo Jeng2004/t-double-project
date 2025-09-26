@@ -14,7 +14,6 @@
     "express": "^5.1.0",
     "formidable": "^3.5.4",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.18.1",
     "next": "15.4.1",
     "nodemailer": "^7.0.5",
     "omise": "^1.0.0",
