@@ -28,7 +28,8 @@ type AllowedStatus =
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
-  | 'จัดส่งสินค้าสำเร็จเเล้ว';
+  | 'จัดส่งสินค้าสำเร็จเเล้ว'
+  | 'กำลังจัดส่งคืนสินค้า';
 
 type OrderRow = {
   id: string;
@@ -44,37 +45,32 @@ type OrderRow = {
   } | null;
 };
 
-/* ---------- API response types (avoid any) ---------- */
+/** ✅ API types (ไม่ใช้ any) */
 type OrderItemApi = {
-  id?: string;
-  productId?: string;
+  id?: string | number;
+  productId?: string | number;
   quantity?: number;
   size?: string;
   unitPrice?: number;
   totalPrice?: number;
   product?: {
-    id?: string;
+    id?: string | number;
     name?: string;
     imageUrls?: string[];
   };
 };
 
 type OrderApi = {
-  id?: string;
+  id?: string | number;
   trackingId?: string;
   status?: string;
   createdAt?: string;
   createdAtThai?: string;
   orderItems?: OrderItemApi[];
-  user?: {
-    id?: string;
-    email?: string | null;
-    name?: string | null;
-  };
+  user?: { id?: string; email?: string | null; name?: string | null };
 };
 
 type Props = {
-  /** ถ้าส่งมา จะแสดงเฉพาะคำสั่งซื้อนี้ (ของผู้ใช้คนปัจจุบันเท่านั้น) */
   orderId?: string;
 };
 
@@ -99,10 +95,11 @@ const statusClass = (status: AllowedStatus): string => {
       return `${styles.status} ${styles.statusShipping}`;
     case 'จัดส่งสินค้าสำเร็จเเล้ว':
       return `${styles.status} ${styles.statusSuccess}`;
+    case 'กำลังจัดส่งคืนสินค้า':
+      return `${styles.status} ${styles.statusReturn}`;
     case 'ยกเลิก':
-      return `${styles.status} ${styles.statusCancel}`;
     default:
-      return `${styles.status} ${styles.statusPending}`;
+      return `${styles.status} ${styles.statusCancel}`;
   }
 };
 
@@ -124,20 +121,16 @@ export default function TrackOrders({ orderId }: Props) {
       setErr(null);
       try {
         const res = await fetch('/api/orders', { cache: 'no-store' });
-        if (!res.ok) {
-          const t = await res.text();
-          throw new Error(`HTTP ${res.status} ${t}`);
-        }
-
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: OrderApi[] = await res.json();
 
         const mapped: OrderRow[] = data.map((o) => {
-          const items: OrderItem[] = Array.isArray(o.orderItems)
-            ? o.orderItems.map((it) => ({
+          const orderItems: OrderItem[] = Array.isArray(o.orderItems)
+            ? o.orderItems.map((it): OrderItem => ({
                 id: String(it.id ?? ''),
                 productId: String(it.productId ?? ''),
                 quantity: Number(it.quantity ?? 0),
-                size: String(it.size ?? 'M') as SizeKey,
+                size: (it.size as SizeKey) ?? 'M',
                 unitPrice: typeof it.unitPrice === 'number' ? it.unitPrice : null,
                 totalPrice: typeof it.totalPrice === 'number' ? it.totalPrice : null,
                 product: it.product
@@ -158,7 +151,7 @@ export default function TrackOrders({ orderId }: Props) {
             status: (o.status as AllowedStatus) ?? 'รอดำเนินการ',
             createdAt: String(o.createdAt ?? ''),
             createdAtThai: o.createdAtThai ?? null,
-            orderItems: items,
+            orderItems,
             user: o.user
               ? {
                   id: o.user.id,
@@ -173,8 +166,7 @@ export default function TrackOrders({ orderId }: Props) {
         const filtered = orderId ? mine.filter((r) => r.id === orderId) : mine;
         setRows(filtered);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'โหลดคำสั่งซื้อไม่สำเร็จ';
-        setErr(msg);
+        setErr(e instanceof Error ? e.message : 'โหลดคำสั่งซื้อไม่สำเร็จ');
       } finally {
         setLoading(false);
       }
@@ -225,85 +217,77 @@ export default function TrackOrders({ orderId }: Props) {
   }
 
   return (
-    <div>
-
-      <div className={styles.orderList}>
-        {rows.map((order) => (
-          <div key={order.id} className={styles.orderCard}>
-            {/* Header */}
-            <div className={styles.orderHeader}>
-              <div className={styles.headerRow}>
-                <div>
-                  <span className={styles.headerLabel}>รหัสคำสั่งซื้อ:</span>{' '}
-                  <span className={styles.headerValue}>{order.id}</span>
-                </div>
-                <div className={styles.headerRight}>
-                  <span className={styles.headerDate}>
-                    {order.createdAtThai ?? order.createdAt}
-                  </span>
-                  <span className={statusClass(order.status)}>{order.status}</span>
-                </div>
+    <div className={styles.orderList}>
+      {rows.map((order) => (
+        <div key={order.id} className={styles.orderCard}>
+          {/* Header */}
+          <div className={styles.orderHeader}>
+            <div className={styles.headerRow}>
+              <div>
+                <span className={styles.headerLabel}>รหัสคำสั่งซื้อ:</span>{' '}
+                <span className={styles.headerValue}>{order.id}</span>
               </div>
-
-              <div className={styles.headerRow}>
-                <div>
-                  <span className={styles.headerLabel}>Tracking:</span>{' '}
-                  <span className={styles.headerValue}>
-                    {order.trackingId ?? 'ยังไม่มี'}
-                  </span>
-                </div>
-              </div>
-              {/* ✅ เพิ่มลิงก์รายละเอียดเพิ่มเติม ตรงขวาล่าง */}
-              <div className={styles.headerRow}>
-                <div></div>
-                <Link href={`/Order-details-id/${order.id}`} className={styles.productExtraLink}>
-                  รายละเอียดเพิ่มเติม →
-                </Link>
+              <div className={styles.headerRight}>
+                <span className={styles.headerDate}>
+                  {order.createdAtThai ?? order.createdAt}
+                </span>
+                <span className={statusClass(order.status)}>{order.status}</span>
               </div>
             </div>
 
-            {/* Items */}
-            <div className={styles.items}>
-              {order.orderItems.map((it) => (
-                <div key={it.id} className={styles.orderItem}>
-                  <Image
-                    className={styles.thumb}
-                    src={firstImage(it.product?.imageUrls)}
-                    alt={it.product?.name || 'product'}
-                    width={60}
-                    height={60}
-                  />
-
-                  <div className={styles.meta}>
-                    <p className={styles.productName}>{it.product?.name ?? '-'}</p>
-
-                    {/* บรรทัด Size เดิม */}
-                    <span className={styles.productDetail}>
-                      Size: {it.size} &nbsp; x{it.quantity}
-                    </span>
-
-
-                  </div>
-
-                  <div className={styles.price}>
-                    ฿
-                    {formatNumber(
-                      (it.totalPrice ??
-                        (typeof it.unitPrice === 'number'
-                          ? it.unitPrice * it.quantity
-                          : 0)) || 0
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className={styles.headerRow}>
+              <div>
+                <span className={styles.headerLabel}>Tracking:</span>{' '}
+                <span className={styles.headerValue}>
+                  {order.trackingId ?? 'ยังไม่มี'}
+                </span>
+              </div>
             </div>
-
+            {/* ลิงก์รายละเอียดเพิ่มเติม */}
+            <div className={styles.headerRow}>
+              <div></div>
+              <Link
+                href={`/Order-details-id/${order.id}`}
+                className={styles.productExtraLink}
+              >
+                รายละเอียดเพิ่มเติม →
+              </Link>
+            </div>
           </div>
-        ))}
-      </div>
 
-      {/* ตัวอย่างการใช้งาน flatItems ถ้าต้องการ */}
-      {/* {flatItems.length} */}
+          {/* Items */}
+          <div className={styles.items}>
+            {order.orderItems.map((it) => (
+              <div key={it.id} className={styles.orderItem}>
+                <Image
+                  className={styles.thumb}
+                  src={firstImage(it.product?.imageUrls)}
+                  alt={it.product?.name || 'product'}
+                  width={60}
+                  height={60}
+                />
+
+                <div className={styles.meta}>
+                  <p className={styles.productName}>{it.product?.name ?? '-'}</p>
+                  <span className={styles.productDetail}>
+                    Size: {it.size} &nbsp; x{it.quantity}
+                  </span>
+                </div>
+
+                <div className={styles.price}>
+                  ฿
+                  {formatNumber(
+                    (it.totalPrice ??
+                      (typeof it.unitPrice === 'number'
+                        ? it.unitPrice * it.quantity
+                        : 0)) || 0
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

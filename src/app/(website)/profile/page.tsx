@@ -33,7 +33,7 @@ export default function ProfilePage() {
 
     const fetchUser = async () => {
       try {
-        const res = await fetch(`/api/profile?userId=${userId}`);
+        const res = await fetch(`/api/profile?userId=${userId}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`โหลดข้อมูลโปรไฟล์ล้มเหลว: ${res.status}`);
         const data = await res.json();
         setUser(data.user);
@@ -135,6 +135,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* คำสั่งซื้อฝั่งขวา */}
         <div className={styles.right}>
           <div className={styles.ordersWrapper}>
             <h4 className={styles.ordersTitle}>ติดตามการสั่งซื้อ</h4>
@@ -144,7 +145,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-
 
       <button
         className={styles.logoutButton}

@@ -1,10 +1,44 @@
+/* Layout พื้นฐาน */
 .container { padding: 40px; background: #fff; }
-.pageTitle { font-weight: 800; font-size: 20px; margin-bottom: 16px; color: #222; }
+.pageTitle { font-weight: 800; font-size: 20px; margin-bottom: 12px; color: #222; }
 
-/* Header: 4 คอลัมน์ */
+/* ===== Toolbar: search + category + result ===== */
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.searchWrap {
+  display: grid;
+  grid-template-columns: 24px 1fr 32px;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fafafa;
+}
+.searchIcon { display: flex; align-items: center; justify-content: center; opacity: .7; }
+.search {
+  padding: 10px 8px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+}
+.clearBtn {
+  width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; font-size: 18px; line-height: 1;
+}
+.catWrap { display: flex; align-items: center; gap: 8px; }
+.catLabel { font-weight: 700; }
+.catSelect { padding: 6px 10px; border-radius: 8px; border: 1px solid #ddd; background: #fff; }
+.resultInfo { color: #555; font-weight: 700; }
+
+/* ===== Header: 5 คอลัมน์ ===== */
 .tableHeader {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1.1fr 1fr 1fr 1fr;
   background: #eee;
   padding: 12px 20px;
   font-weight: 700;
@@ -12,12 +46,12 @@
   border-radius: 8px;
   margin-bottom: 10px;
 }
-.colName, .colCategory, .colSizeRange, .colEdit { display: flex; align-items: center; }
+.colName, .colCode, .colCategory, .colSizeRange, .colEdit { display: flex; align-items: center; }
 
-/* แถวสินค้า */
+/* ===== แถวสินค้า ===== */
 .card {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr; /* ให้ตรงกับ header */
+  grid-template-columns: 2fr 1.1fr 1fr 1fr 1fr;
   align-items: center;
   padding: 12px 20px;
   border: 1px solid #e6e6e6;
@@ -28,28 +62,45 @@
 }
 
 /* คอลัมน์ 1: รูป + ชื่อ */
-.productInfo { display: flex; align-items: center; gap: 16px; }
-.imageBox { position: relative; width: 140px; height: 140px; cursor: pointer; }
-.image {
-  width: 100%; height: 100%; object-fit: cover;
-  border-radius: 8px; border: 1px solid #ddd; background: #fff;
-}
-.name { font-weight: 700; color: #111; font-size: 14px; margin: 0; }
+.productInfo { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.imageBox { position: relative; width: 140px; height: 140px; flex: 0 0 140px; cursor: pointer; }
+.image { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; background: #fff; }
+.name { font-weight: 700; color: #111; font-size: 14px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* คอลัมน์ 2–3 */
+/* คอลัมน์ 2: รหัสสินค้า */
+.colCodeCell {
+  font-weight: 700;
+  color: #222;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* คอลัมน์ 3–4 */
 .category, .sizeRange { font-size: 14px; color: #444; }
 .sizeRange { font-weight: 600; }
 
-/* คอลัมน์ 4: จัดการสินค้า → ปุ่มชิดซ้าย (เพื่อให้อยู่ใต้หัวคอลัมน์พอดี) */
+/* คอลัมน์ 5: จัดการสินค้า → ปุ่มชิดซ้าย */
 .editCol { display: flex; justify-content: flex-start; }
 .editCol button {
   background: #000; color: #fff; border: none;
   padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer;
 }
 
-/* Responsive */
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+  .toolbar { grid-template-columns: 1fr 1fr; }
+  .resultInfo { grid-column: 1 / -1; }
+  .tableHeader { grid-template-columns: 2fr 1fr 1fr 1fr 1fr; }
+  .card { grid-template-columns: 2fr 1fr 1fr 1fr 1fr; }
+}
 @media (max-width: 720px) {
+  .toolbar { grid-template-columns: 1fr; row-gap: 8px; }
   .tableHeader { display: none; }
   .card { grid-template-columns: 1fr; row-gap: 8px; }
+  .productInfo { gap: 12px; }
+  .imageBox { width: 100px; height: 100px; flex-basis: 100px; }
+  .category, .sizeRange, .colCodeCell { font-size: 13px; }
   .editCol { justify-content: flex-start; }
 }

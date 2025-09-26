@@ -1,0 +1,178 @@
+/* Layout */
+.page { background: #f5f5f5; min-height: 100vh; }
+.container { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; background: #fff; }
+
+.title { font-size: 24px; font-weight: 800; margin: 8px 0 12px; color: #222; }
+.orderIdRow { color: #666; margin-bottom: 24px; font-size: 14px; }
+.orderId { font-weight: 800; color: #111; }
+
+.section { margin: 24px 0 16px; }
+.sectionTitle { font-size: 16px; font-weight: 800; margin: 0 0 12px; color: #222; }
+
+/* Label / Value 2 คอลัมน์ */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  row-gap: 12px;
+  column-gap: 12px;
+}
+.infoLabel { color: #666; font-weight: 600; text-align: left; }
+.infoValue { color: #111; font-weight: 700; text-align: right; }
+
+/* Title + Badge */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+/* Badge (เหมือนฝั่ง user) */
+/* Badge */
+.badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+
+/* ยกเลิก = แดง */
+.badgeCancel {
+  background: #fff1f0;
+  color: #cf1322;
+  border-color: #ffa39e;
+}
+
+/* รอดำเนินการ = เทา */
+.badgePending {
+  background: #f5f5f5;
+  color: #595959;
+  border-color: #d9d9d9;
+}
+
+/* กำลังดำเนินการจัดเตรียมสินค้า = น้ำเงิน */
+.badgePreparing {
+  background: #e6f4ff;
+  color: #0958d9;
+  border-color: #91caff;
+}
+
+/* กำลังดำเนินการจัดส่งสินค้า = ส้ม */
+.badgeShipping {
+  background: #fff7e6;
+  color: #d46b08;
+  border-color: #ffd591;
+}
+
+/* จัดส่งสินค้าสำเร็จแล้ว = เขียว */
+.badgeSuccess {
+  background: #f6ffed;
+  color: #389e0d;
+  border-color: #b7eb8f;
+}
+
+/* กำลังจัดส่งคืนสินค้า = ส้มอ่อน */
+.badgeReturn {
+  background: #fff2e8;
+  color: #d4380d;
+  border-color: #ffbb96;
+}
+
+
+/* แถวสินค้า (เหมือนฝั่ง user) */
+.itemRow {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fafafa;
+}
+.thumbBox { display: flex; align-items: center; justify-content: center; }
+.thumb { border-radius: 10px; border: 1px solid #eee; background: #fff; }
+.itemMeta { min-width: 0; }
+.itemName { font-weight: 800; margin: 0 0 6px; color: #111; }
+.itemSub { color: #666; font-size: 13px; margin-bottom: 6px; }
+.itemPrice { font-weight: 800; color: #111; text-align: right; white-space: nowrap; }
+
+/* การ์ดข้อมูลลูกค้าแบบบาง ไม่เป็นกล่องหนา */
+.recipientCard { border: 1px solid #ddd; border-radius: 10px; padding: 16px; background: #fff; }
+.recRow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 10px; }
+.recRow:last-child { margin-bottom: 0; }
+.recCol { min-width: 0; }
+.recLabel { color: #666; font-weight: 600; margin-bottom: 4px; }
+.recValue { color: #111; font-weight: 700; }
+
+/* ปุ่มสำหรับแอดมิน */
+.actions { display: flex; gap: 12px; margin-top: 24px; }
+.btnPrimary, .btnDanger, .btnGhost {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.btnPrimary { background: #111; color: #fff; }
+.btnPrimary:disabled { opacity: .6; cursor: not-allowed; }
+.btnDanger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.btnDanger:disabled { opacity: .6; cursor: not-allowed; }
+.btnGhost { background: #fff; color: #111; border: 1px solid #ddd; }
+
+.error { color: #c00; margin: 12px 0; }
+
+/* สลิปจำลอง */
+.fakeSlip {
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  max-width: 560px;
+}
+.fakeSlipHeader {
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: .4px;
+  margin-bottom: 8px;
+  color: #374151;
+}
+.fakeSlipBody {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: #111;
+}
+
+/* จัดส่ง */
+.shippingInfo {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: #0a58ca;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+.linkBtn:hover { opacity: .85; }
+
+/* Responsive */
+@media (max-width: 720px) {
+  .infoGrid { grid-template-columns: 1fr; }
+  .infoLabel { text-align: left; }
+  .infoValue { text-align: left; }
+  .itemRow { grid-template-columns: 100px 1fr; }
+  .recRow { grid-template-columns: 1fr; }
+  .actions { flex-direction: column; }
+}

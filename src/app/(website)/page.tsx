@@ -75,9 +75,8 @@ export default function Home() {
                   <Product
                     key={p.id}
                     name={p.name}
-                    price={p.price}
+                    stock={p.stock}
                     imageUrl={imageUrl}
-                    isOutOfStock={isOut}
                     onClick={() => router.push(`/product/${p.id}`)}
                   />
                 );

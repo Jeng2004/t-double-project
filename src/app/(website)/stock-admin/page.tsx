@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import NavbarAdmin from '../components/NavbarAdmin';
 import Stock from '../components/stock';
-import EditStock from '../components/editstock';
 import type { UIProduct, SizeKey } from '@/types/product';
 
 export default function StockAdminPage() {
@@ -66,13 +65,7 @@ export default function StockAdminPage() {
     <>
       <NavbarAdmin />
       <Stock onEditClick={openEdit} onDeleted={handleDeleteDone} />
-      {showEditStock && selectedProduct && (
-        <EditStock
-          product={selectedProduct}
-          onClose={() => setShowEditStock(false)}
-          onSave={handleSave}   // ← ตอนนี้ EditStock จะส่ง priceBySize มาให้
-        />
-      )}
+
     </>
   );
 }

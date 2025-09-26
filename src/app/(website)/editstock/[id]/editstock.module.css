@@ -98,16 +98,6 @@
   background: #fafafa;
 }
 
-.smallBtn {
-  background: #f3f3f3;
-  border: 1px solid #e5e5e5;
-  color: #222;
-  font-weight: 700;
-  padding: 6px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
 /* ปุ่มล่างขวา */
 .footerBtns {
   display: flex;

@@ -231,4 +231,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ไม่สามารถสร้างคำสั่งซื้อได้" }, { status: 500 });
   }
 }
-
