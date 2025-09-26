@@ -1,4 +1,4 @@
-// /api/orders/return/[id]/route.ts  (ใช้เวอร์ชันจาก main)
+// /api/orders/return/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import nodemailer from "nodemailer";
@@ -7,22 +7,32 @@ import Stripe from "stripe";
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// 🕒 แปลงเวลาเป็นเขตไทย
-function formatToThaiTime(date: Date | string) {
-  return new Date(date).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", hour12: false });
+// 🕒 ฟังก์ชันแปลงเวลาไทย
+function formatToThaiTime(date: Date) {
+  return new Date(date).toLocaleString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    hour12: false,
+  });
 }
 
-// 📧 ส่งอีเมล (มีการ์ด env)
+// 📧 ฟังก์ชันส่งอีเมล
 async function sendEmail(to: string, subject: string, html: string) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn("⚠️ ไม่มี EMAIL_USER/EMAIL_PASS — ข้ามการส่งอีเมล");
+    console.warn("⚠️ ไม่มีการตั้งค่า EMAIL_USER/EMAIL_PASS ข้ามการส่งอีเมล");
     return;
   }
+  console.log(`📧 กำลังส่งอีเมลไปยัง: ${to}, subject: ${subject}`);
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
   });
-  await transporter.sendMail({ from: `"ร้านค้าออนไลน์" <${process.env.EMAIL_USER}>`, to, subject, html });
+  await transporter.sendMail({
+    from: `"ร้านค้าออนไลน์" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html,
+  });
+  console.log("✅ ส่งอีเมลสำเร็จ");
 }
 
 /* -----------------------------------
@@ -39,7 +49,9 @@ export async function GET(
     const request = await prisma.returnRequest.findUnique({
       where: { id },
       include: {
-        items: { include: { orderItem: { include: { product: true } } } },
+        items: {
+          include: { orderItem: { include: { product: true } } },
+        },
         order: { include: { user: true } },
       },
     });
@@ -70,14 +82,17 @@ export async function PATCH(
     console.log(`✏️ PATCH id=${id}, status=${status}, refundAmount=${refundAmount}, adminNote=${adminNote}`);
 
     if (!["approved", "rejected"].includes(status)) {
+      console.warn(`⚠️ Status ไม่ถูกต้อง: ${status}`);
       return NextResponse.json({ error: "สถานะไม่ถูกต้อง" }, { status: 400 });
     }
 
-    // ดึงคำขอ + ออเดอร์ + ผู้ใช้
+    // ✅ ดึง ReturnRequest + Order + User
     const request = await prisma.returnRequest.findUnique({
       where: { id },
       include: {
-        items: { include: { orderItem: { include: { product: true } } } },
+        items: {
+          include: { orderItem: { include: { product: true } } },
+        },
         order: { include: { user: true } },
       },
     });
@@ -86,17 +101,25 @@ export async function PATCH(
       console.warn(`⚠️ ไม่พบ ReturnRequest id=${id}`);
       return NextResponse.json({ error: "ไม่พบคำขอคืนสินค้า" }, { status: 404 });
     }
+    console.log(`📦 พบ ReturnRequest id=${id}, orderId=${request.orderId}, user=${request.order.user.email}`);
+
+    // 🚨 กันกดซ้ำ
     if (request.status !== "pending") {
+      console.warn(`⛔ ไม่สามารถอัปเดต ReturnRequest id=${id} ได้ เนื่องจากสถานะปัจจุบันคือ '${request.status}'`);
       return NextResponse.json(
         { error: `ไม่สามารถอัปเดตได้ เนื่องจากสถานะปัจจุบันคือ '${request.status}'` },
         { status: 400 }
       );
     }
 
-    // อัปเดตสถานะคำขอ
+    // ✅ อัปเดต ReturnRequest
     const updated = await prisma.returnRequest.update({
       where: { id },
-      data: { status, adminNote: adminNote ?? null, updatedAt: new Date() },
+      data: {
+        status,
+        adminNote: adminNote ?? null,
+        updatedAt: new Date(),
+      },
       include: {
         order: { include: { user: true } },
         items: { include: { orderItem: { include: { product: true } } } },
@@ -104,30 +127,44 @@ export async function PATCH(
     });
     console.log(`✅ ReturnRequest อัปเดตแล้ว: id=${id}, status=${status}`);
 
-    // ถ้าอนุมัติ: อัปเดตสถานะ Order และคืนสต็อก
+    // ✅ ถ้าอนุมัติ → อัปเดต Order เป็น "ลูกค้าคืนสินค้า"
     if (status === "approved") {
       await prisma.order.update({
         where: { id: updated.orderId },
-        data: { status: "ลูกค้าคืนสินค้า", updatedAt: new Date() },
+        data: {
+          status: "ลูกค้าคืนสินค้า",
+          updatedAt: new Date(),
+        },
       });
+      console.log(`🔄 Order ${updated.orderId} อัปเดตเป็น 'ลูกค้าคืนสินค้า'`);
+    }
 
+    // ✅ คืน Stock ถ้าอนุมัติ
+    if (status === "approved") {
       for (const item of updated.items) {
         const product = item.orderItem?.product;
-        if (!product) continue;
-        const stock = (product.stock as Record<string, number>) || {};
-        const before = Number(stock[item.orderItem.size] ?? 0);
-        stock[item.orderItem.size] = before + item.quantity;
-        await prisma.product.update({ where: { id: product.id }, data: { stock } });
-        console.log(`📦 คืน Stock -> ${product.name} [${item.orderItem.size}] ${before} ➝ ${stock[item.orderItem.size]}`);
+        if (product) {
+          const stock: Record<string, number> = product.stock as any;
+          const before = stock[item.orderItem.size];
+          stock[item.orderItem.size] += item.quantity;
+          const after = stock[item.orderItem.size];
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { stock },
+          });
+          console.log(`📦 คืน Stock -> ${product.name} [${item.orderItem.size}] ${before} ➝ ${after}`);
+        }
       }
     }
 
-    // คืนเงิน Stripe (ถ้าอนุมัติและออเดอร์เคยจ่าย)
+    // ✅ คืนเงิน Stripe ถ้าอนุมัติ
     try {
       if (status === "approved" && updated.order.isPaid && updated.order.paymentIntentId) {
-        const refundData: Stripe.RefundCreateParams = { payment_intent: updated.order.paymentIntentId };
+        const refundData: Stripe.RefundCreateParams = {
+          payment_intent: updated.order.paymentIntentId,
+        };
         if (refundAmount && refundAmount > 0) {
-          refundData.amount = Math.round(refundAmount * 100); // บาท -> สตางค์
+          refundData.amount = Math.round(refundAmount * 100);
           console.log(`💸 Partial Refund ${refundAmount} บาท`);
         } else {
           console.log(`💸 Full Refund ${updated.order.totalAmount} บาท`);
@@ -139,8 +176,9 @@ export async function PATCH(
       console.error("❌ Stripe Refund error:", refundErr);
     }
 
-    // ส่งอีเมลแจ้งลูกค้า
+    // 📧 ส่งอีเมลแจ้งลูกค้า
     try {
+      console.log(`📧 กำลังส่งอีเมลถึง ${updated.order.user.email}`);
       await sendEmail(
         updated.order.user.email,
         `T-Double คำขอคืนสินค้า #${updated.order.trackingId}`,
@@ -157,6 +195,7 @@ export async function PATCH(
       console.error("❌ ส่งอีเมลล้มเหลว:", mailErr);
     }
 
+    console.log(`✅ PATCH เสร็จสิ้น id=${id}, status=${status}`);
     return NextResponse.json(
       { message: `✅ อัปเดตสถานะคำขอเป็น ${status} เรียบร้อย และอัปเดต Order เป็น 'ลูกค้าคืนสินค้า'`, request: updated },
       { status: 200 }
@@ -184,10 +223,13 @@ export async function DELETE(
       return NextResponse.json({ error: "ไม่พบคำขอคืนสินค้า" }, { status: 404 });
     }
 
-    // ไม่ลบจริง เปลี่ยนสถานะเป็น cancelled
+    // ❌ ไม่ลบจริง แต่เปลี่ยนสถานะเป็น cancelled
     const updated = await prisma.returnRequest.update({
       where: { id },
-      data: { status: "cancelled", updatedAt: new Date() },
+      data: {
+        status: "cancelled",
+        updatedAt: new Date(),
+      },
     });
     console.log(`✅ ReturnRequest id=${id} เปลี่ยนเป็น cancelled`);
 
