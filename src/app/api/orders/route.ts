@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
+import Stripe from "stripe";
 
 const prisma = new PrismaClient();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 /** ✅ ฟังก์ชันแปลงเวลา UTC -> เวลาไทย (ICT, UTC+7) */
 function formatToThaiTime(date: Date) {
@@ -29,7 +31,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "ไม่พบคำสั่งซื้อนี้" }, { status: 404 });
       }
 
-      // ส่งคืนตามเดิม (ถ้ามี createdAtThai ใน DB จะติดมาด้วย)
       return NextResponse.json(order, { status: 200 });
     } else {
       const orders = await prisma.order.findMany({
@@ -94,9 +95,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    
 
-    
     // อัปเดต user profile ถ้ายังไม่มี
     if (!user.name || !user.phone || !user.address || !user.email) {
       await prisma.user.update({
@@ -147,34 +146,61 @@ export async function POST(req: NextRequest) {
 
     console.log(`💰 ยอดรวมที่ต้องชำระ: ${totalAmount}`);
 
-    // ✅ Transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // ➕ คำนวณเวลาไทยและบันทึกลงฐานข้อมูล (ต้องมีฟิลด์ createdAtThai ใน Order model)
-      const createdAtThai = formatToThaiTime(new Date());
-
-      const createdOrder = await tx.order.create({
-        data: {
-          trackingId: `TRK-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
-          totalAmount,
-          status: "รอดำเนินการ",
-          createdAtThai, // ✅ เก็บเวลาไทยลง DB
-          orderItems: {
-            create: orderItems.map((item: any) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.price,
-              size: item.size,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-            })),
-          },
-          user: { connect: { id: userId } },
+    // ✅ สร้าง Order (ยังไม่หัก stock)
+    const createdOrder = await prisma.order.create({
+      data: {
+        trackingId: `TRK-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
+        totalAmount,
+        status: "รอชำระเงิน",
+        createdAtThai: formatToThaiTime(new Date()),
+        isPaid: false,
+        orderItems: {
+          create: orderItems.map((item: any) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price,
+            size: item.size,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
         },
-        include: { orderItems: { include: { product: true } }, user: true },
-      });
+        user: { connect: { id: userId } },
+      },
+      include: { orderItems: { include: { product: true } }, user: true },
+    });
 
-      // หัก stock
-      for (const item of orderItems) {
+    console.log(`✅ คำสั่งซื้อสำเร็จ (รอชำระ): ${createdOrder.id}`);
+
+    return NextResponse.json(
+      { message: "✅ สร้างคำสั่งซื้อเรียบร้อยแล้ว กรุณาชำระเงินก่อน", order: createdOrder },
+      { status: 201 }
+    );
+  } catch (err) {
+    console.error("❌ Error creating order:", err);
+    return NextResponse.json({ error: "ไม่สามารถสร้างคำสั่งซื้อได้" }, { status: 500 });
+  }
+}
+
+// ---------------------- API PATCH: ชำระเงิน (manual) ----------------------
+export async function PATCH(req: NextRequest) {
+  try {
+    const { orderId } = await req.json();
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { orderItems: true, user: true },
+    });
+
+    if (!order) {
+      return NextResponse.json({ error: "ไม่พบคำสั่งซื้อนี้" }, { status: 404 });
+    }
+
+    if (order.isPaid) {
+      return NextResponse.json({ error: "คำสั่งซื้อนี้ชำระเงินแล้ว" }, { status: 400 });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      for (const item of order.orderItems) {
         const product = await tx.product.findUnique({ where: { id: item.productId } });
         if (!product) continue;
 
@@ -185,50 +211,73 @@ export async function POST(req: NextRequest) {
           where: { id: product.id },
           data: { stock },
         });
-
-        console.log(
-          `✅ หักสต๊อก ${product.name} (${item.size}) คงเหลือ: ${stock[item.size]}`
-        );
       }
 
-      // ล้างตะกร้า
-      await tx.cartItem.deleteMany({ where: { userId } });
-      console.log("🧹 ล้างตะกร้าสำเร็จ");
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
+        data: { isPaid: true, status: "รอดำเนินการ" },
+        include: { orderItems: { include: { product: true } }, user: true },
+      });
 
-      return createdOrder;
+      await tx.cartItem.deleteMany({ where: { userId: order.userId } });
+
+      return updatedOrder;
     });
 
-    console.log(`✅ คำสั่งซื้อสำเร็จ! หมายเลขคำสั่งซื้อ: ${result.id}`);
-
-    // ส่งอีเมลยืนยัน (แสดงเวลาไทยจาก DB)
-    try {
-      await sendEmail(
-        result.user.email,
-        `T-Double คำสั่งซื้อ #${result.trackingId}`,
-        `
-          <h2>✅ สั่งซื้อสำเร็จ!</h2>
-          <p>สวัสดีคุณ <b>${result.user.name ?? ""}</b></p>
-          <p>คำสั่งซื้อของคุณถูกสร้างเรียบร้อยแล้ว</p>
-          <p><b>หมายเลขคำสั่งซื้อ:</b> ${result.id}</p>
-          <p><b>Tracking ID:</b> ${result.trackingId}</p>
-          <p><b>ยอดรวม:</b> ${result.totalAmount.toLocaleString()} บาท</p>
-          <p><b>สถานะ:</b> ${result.status}</p>
-          <p><b>เวลาที่สั่งซื้อ :</b> ${result.createdAtThai ?? formatToThaiTime(result.createdAt)}</p>
-          <br />
-          <p>ขอบคุณที่ใช้บริการ 🙏</p>
-        `
-      );
-    } catch (err) {
-      console.error("❌ ส่งอีเมลล้มเหลว:", err);
-    }
-
     return NextResponse.json(
-      { message: "✅ สร้างคำสั่งซื้อเรียบร้อยแล้ว", order: result },
-      { status: 201 }
+      { message: "✅ ชำระเงินสำเร็จและหักสต๊อกแล้ว", order: result },
+      { status: 200 }
     );
   } catch (err) {
-    console.error("❌ Error creating order:", err);
-    return NextResponse.json({ error: "ไม่สามารถสร้างคำสั่งซื้อได้" }, { status: 500 });
+    console.error("❌ Error in payment:", err);
+    return NextResponse.json({ error: "ไม่สามารถดำเนินการชำระเงินได้" }, { status: 500 });
   }
 }
 
+// ---------------------- PUT: สร้าง Stripe Checkout Session ----------------------
+export async function PUT(req: NextRequest) {
+  try {
+    const { orderId } = await req.json();
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { orderItems: { include: { product: true } }, user: true },
+    });
+
+    if (!order) return NextResponse.json({ error: "ไม่พบคำสั่งซื้อ" }, { status: 404 });
+
+    const lineItems = order.orderItems.map((item) => {
+      const product = item.product;
+      const imageUrls =
+        product.imageUrls?.map((url) =>
+          url.startsWith("http") ? url : `${process.env.APP_URL}${url}`
+        ) || ["https://via.placeholder.com/150"];
+      return {
+        price_data: {
+          currency: "thb",
+          product_data: { name: product.name, images: imageUrls },
+          unit_amount: Math.round(item.price * 100),
+        },
+        quantity: item.quantity,
+      };
+    });
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card", "promptpay"],
+      line_items: lineItems,
+      mode: "payment",
+      success_url: `${process.env.APP_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_URL}/payment/cancel`,
+      metadata: {
+        userId: order.userId,
+        orderId: order.id,
+        trackingId: order.trackingId,
+      },
+      payment_intent_data: { capture_method: "automatic" },
+    });
+
+    return NextResponse.json({ url: session.url }, { status: 200 });
+  } catch (error: any) {
+    console.error("❌ Error creating session:", error.message);
+    return NextResponse.json({ error: "ไม่สามารถสร้าง session ได้" }, { status: 500 });
+  }
+}

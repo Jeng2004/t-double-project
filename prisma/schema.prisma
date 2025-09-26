@@ -25,20 +25,17 @@ model User {
   address       String?
   profileImage  String?
 
-  // 🟢 ความสัมพันธ์กับ Order
   orders        Order[]
-
-  // 🟢 ความสัมพันธ์กับ SpecialOrder
-  specialOrders SpecialOrder[]   // 👈 เพิ่มบรรทัดนี้
+  specialOrders SpecialOrder[]
 }
 
 model Product {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
-  category    String?       // ✅ เพิ่มฟิลด์นี้
-  price       Json         // เก็บราคาแต่ละไซส์ {"S": 100, "M": 200}
-  stock       Json         // {"S": 10, "M": 20, ...}
+  category    String?
+  price       Json
+  stock       Json
   imageUrls   String[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -73,11 +70,9 @@ model OrderItem {
   unitPrice   Float
   totalPrice  Float
 
-  // 👉 สถานะสินค้า
   status         String      @default("ปกติ")
   returnQuantity Int?        @default(0)
 
-  // 👇 ความสัมพันธ์กับ ReturnItem
   returnItems    ReturnItem[]
 }
 
@@ -89,11 +84,12 @@ model Order {
   status          String           @default("pending")
   trackingId      String           @unique
   createdAt       DateTime         @default(now())
-  cancelReason  String?            // ✅ เพิ่มฟิลด์นี้
+  updatedAt       DateTime         @updatedAt
+  cancelReason    String?
   createdAtThai   String?
+  isPaid          Boolean          @default(false)
+  paymentIntentId String?
   orderItems      OrderItem[]
-
-  // ✅ ความสัมพันธ์กับ ReturnRequest
   returnRequests  ReturnRequest[]
 }
 
@@ -101,15 +97,14 @@ model ReturnRequest {
   id        String       @id @default(auto()) @map("_id") @db.ObjectId
   orderId   String       @db.ObjectId
   order     Order        @relation(fields: [orderId], references: [id])
-  status    String       @default("pending") // pending, approved, rejected
-  reason    String?      // เหตุผลลูกค้า
-  adminNote String?      // เหตุผลแอดมิน
-  images    String[]     // เก็บ path รูป
+
+  status    String       @default("pending")
+  reason    String?
+  adminNote String?
+  images    String[]
   category  String?       
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
-
-  // ✅ relation กับ ReturnItem
   items     ReturnItem[]
 }
 
@@ -122,30 +117,50 @@ model ReturnItem {
   orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
 
   quantity        Int
-
-  // ✅ ห้ามคืนซ้ำสินค้าเดียวกัน
   @@unique([orderItemId])
 }
 
 model SpecialOrder {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  firstName    String
-  lastName     String
-  phone        String
-  email        String
-  address      String
-  productType  String
-  model        String
-  quantity     Int
-  sizeLabel    String
-  chest        Float
-  length       Float
-  notes        String?
-  status       String   @default("pending")
-  cancelReason String?
-  createdAt    DateTime @default(now())
-  createdAtThai String?  // ✅ เก็บเวลาไทยลง DB
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  firstName      String
+  lastName       String
+  phone          String
+  email          String
+  address        String
+  category       String
+  productName    String
+  color          String?
+  quantity       Int
+  sizeDetail     String
+  status         String   @default("รอดำเนินการ")
+  cancelReason   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime? @updatedAt @default(now())
+  createdAtThai  String?
+  price          Int?
+  isApproved     Boolean  @default(false)
+  paymentUrl     String?
+  trackingId     String?
+  paymentIntentId String?
+  refundId        String?
 
-  userId       String   @db.ObjectId
-  user         User     @relation(fields: [userId], references: [id])
+  userId String?  @db.ObjectId
+  user   User?    @relation(fields: [userId], references: [id])
+
+  // 👇 ความสัมพันธ์ใหม่
+  returnRequests ReturnSpecialRequest[]
 }
+
+model ReturnSpecialRequest {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  specialOrderId String        @db.ObjectId
+  specialOrder   SpecialOrder  @relation(fields: [specialOrderId], references: [id])
+
+  status    String       @default("รอดำเนินการ") // รอดำเนินการ, อนุมัติ, ปฏิเสธ
+  reason    String?
+  adminNote String?
+  images    String[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+

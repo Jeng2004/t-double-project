@@ -83,6 +83,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 🚨 ตรวจสอบเวลา (ไม่เกิน 3 วันหลังจัดส่ง)
+    const deliveredAt = order.updatedAt ?? order.createdAt; // ใช้ updatedAt เป็นเวลาจัดส่ง
+    const now = new Date();
+    const diffDays =
+      (now.getTime() - new Date(deliveredAt).getTime()) /
+      (1000 * 60 * 60 * 24);
+
+    if (diffDays > 3) {
+      return NextResponse.json(
+        { error: "ไม่สามารถคืนสินค้าได้ เนื่องจากเกิน 3 วันหลังจัดส่ง" },
+        { status: 400 }
+      );
+    }
+
     // ✅ ตรวจสอบสินค้าและจำนวน
     for (const item of items) {
       const orderItem = order.orderItems.find((oi) => oi.id === item.orderItemId);
@@ -132,7 +146,7 @@ export async function POST(req: NextRequest) {
         orderId,
         reason: reason ?? "",
         images: savedPaths,
-        status: "รอดำเนินการ", // 👈 เริ่มต้นด้วย "รอดำเนินการ"
+        status: "รอดำเนินการ",
         items: {
           create: items.map((item) => ({
             orderItemId: item.orderItemId,
