@@ -59,21 +59,22 @@ export async function PATCH(
       );
     }
 
-    // ตรวจสอบว่ามี order จริงไหม
+    // 🔎 ตรวจสอบก่อนว่ามี order จริงไหม
     const existing = await prisma.specialOrder.findUnique({ where: { id } });
     console.log("💡 Existing order:", existing);
+
     if (!existing) {
       return NextResponse.json({ error: "ไม่พบคำสั่งซื้อ" }, { status: 404 });
     }
 
-    // อัพเดทสถานะ
+    // ✅ อัพเดทสถานะ
     const order = await prisma.specialOrder.update({
       where: { id },
       data: { status },
       include: { user: true },
     });
 
-    // ส่งอีเมลแจ้งลูกค้า
+    // ✅ ส่งอีเมลแจ้งลูกค้า
     try {
       if (order.email) {
         await sendEmail(
