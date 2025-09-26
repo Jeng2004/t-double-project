@@ -239,7 +239,7 @@ export default function CartPage() {
           <button
             className={styles.checkout}
             disabled={items.length === 0}
-            onClick={() => router.push('/Order-details')}
+            onClick={() => router.push('/payment')}
           >
             ดำเนินการชำระเงิน
           </button>

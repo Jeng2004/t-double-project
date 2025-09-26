@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from './Add-product-admin.module.css';
 import NavbarAdmin from '../components/NavbarAdmin';
+import Image from 'next/image';
 
 type FormState = {
   name: string;
@@ -12,12 +13,13 @@ type FormState = {
   stock_M: string;
   stock_L: string;
   stock_XL: string;
-  // ✅ เพิ่มราคาแยกตามไซส์ (ตาม API ใหม่)
   price_S: string;
   price_M: string;
   price_L: string;
   price_XL: string;
 };
+
+const SIZES = ['S', 'M', 'L', 'XL'] as const;
 
 export default function AddProductAdminPage() {
   const [form, setForm] = useState<FormState>({
@@ -54,7 +56,6 @@ export default function AddProductAdminPage() {
     e.preventDefault();
     if (submitting) return;
 
-    // ✅ validations
     if (!form.name.trim()) return setMessage('กรุณาใส่ชื่อสินค้า');
 
     // ต้องมีราคาอย่างน้อย 1 ไซส์ > 0
@@ -74,12 +75,15 @@ export default function AddProductAdminPage() {
     const formData = new FormData();
     formData.append('name', form.name.trim());
     formData.append('description', form.description || '');
+    formData.append('category', form.category || '');
+
+    // สต็อก
     formData.append('stock_S', form.stock_S || '0');
     formData.append('stock_M', form.stock_M || '0');
     formData.append('stock_L', form.stock_L || '0');
     formData.append('stock_XL', form.stock_XL || '0');
 
-    // ✅ ส่งราคาตามชื่อฟิลด์ที่ API ใหม่รอรับ
+    // ราคา
     formData.append('price_S', form.price_S || '0');
     formData.append('price_M', form.price_M || '0');
     formData.append('price_L', form.price_L || '0');
@@ -93,13 +97,12 @@ export default function AddProductAdminPage() {
       const res = await fetch('/api/products', {
         method: 'POST',
         body: formData,
-        credentials: 'include', // ส่ง cookie authToken ไปด้วย
+        credentials: 'include',
       });
 
       const data = await res.json();
       if (res.ok) {
         setMessage('✅ เพิ่มสินค้าเรียบร้อยแล้ว');
-        // reset form
         setForm({
           name: '',
           description: '',
@@ -115,7 +118,6 @@ export default function AddProductAdminPage() {
         });
         setImages(null);
         setCurrentImageIndex(0);
-        // ลบพรีวิวเดิม + revoke URLs
         setImagePreview((prev) => {
           prev.forEach((url) => URL.revokeObjectURL(url));
           return [];
@@ -135,7 +137,6 @@ export default function AddProductAdminPage() {
     const files = e.target.files;
     if (!files) return;
 
-    // ล้างของเก่ากัน memory leak
     setImagePreview((prev) => {
       prev.forEach((url) => URL.revokeObjectURL(url));
       return [];
@@ -147,18 +148,15 @@ export default function AddProductAdminPage() {
     setCurrentImageIndex(0);
   };
 
-  // กัน memory leak ตอน unmount
   useEffect(() => {
     return () => {
       imagePreview.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [imagePreview]);
 
-  // ---- พรีวิว: คลิกซ้าย/ขวาเพื่อเปลี่ยน (ไม่มีปุ่ม) ----
-  const prev = (len: number) =>
-    setCurrentImageIndex((i) => (i - 1 + len) % len);
-  const next = (len: number) =>
-    setCurrentImageIndex((i) => (i + 1) % len);
+  // พรีวิว: คลิกซ้าย/ขวาเพื่อเปลี่ยน
+  const prev = (len: number) => setCurrentImageIndex((i) => (i - 1 + len) % len);
+  const next = (len: number) => setCurrentImageIndex((i) => (i + 1) % len);
 
   const handleStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const len = imagePreview.length;
@@ -180,7 +178,7 @@ export default function AddProductAdminPage() {
     <>
       <NavbarAdmin />
       <div className={styles.container}>
-        {/* ซ้าย: พรีวิวรูป (คลิกซ้าย/ขวา) */}
+        {/* ซ้าย: พรีวิวรูป */}
         <div className={styles.left}>
           {imagePreview.length > 0 && (
             <div
@@ -197,11 +195,14 @@ export default function AddProductAdminPage() {
                   : 'มีเพียงรูปเดียว'
               }
             >
-              <img
+              <Image
                 src={imagePreview[currentImageIndex]}
                 alt={`Preview ${currentImageIndex + 1} / ${imagePreview.length}`}
                 className={styles.previewImage}
                 draggable={false}
+                width={420}              // ✅ ต้องใส่ width / height
+                height={525}             // ✅ หรือใช้ aspect-ratio ใกล้เคียง
+                priority={currentImageIndex === 0}   // โหลดภาพแรกเร็วขึ้น
               />
               {imagePreview.length > 1 && (
                 <>
@@ -215,7 +216,7 @@ export default function AddProductAdminPage() {
 
         {/* ขวา: ฟอร์ม */}
         <div className={styles.right}>
-          <h2 className={styles.title}>เพิ่มสินค้า</h2>
+          <h2 className={styles.title}>ADD PRODUCT</h2>
           <hr className={styles.line} />
 
           <form className={styles.form} onSubmit={handleUpload}>
@@ -234,142 +235,7 @@ export default function AddProductAdminPage() {
               <label className={styles.label}>ชื่อสินค้า</label>
             </div>
 
-            {/* จำนวนแต่ละไซส์ */}
-            <div className={styles.sizeSection}>
-              <label className={styles.sizeLabel}>จำนวนแต่ละไซส์</label>
-              <div className={styles.sizeInputs}>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>S</label>
-                  <input
-                    type="number"
-                    name="stock_S"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.stock_S}
-                    onChange={handleChange}
-                    inputMode="numeric"
-                    min={0}
-                  />
-                </div>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>M</label>
-                  <input
-                    type="number"
-                    name="stock_M"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.stock_M}
-                    onChange={handleChange}
-                    inputMode="numeric"
-                    min={0}
-                  />
-                </div>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>L</label>
-                  <input
-                    type="number"
-                    name="stock_L"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.stock_L}
-                    onChange={handleChange}
-                    inputMode="numeric"
-                    min={0}
-                  />
-                </div>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>XL</label>
-                  <input
-                    type="number"
-                    name="stock_XL"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.stock_XL}
-                    onChange={handleChange}
-                    inputMode="numeric"
-                    min={0}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* ราคาแยกตามไซส์ */}
-            <div className={styles.sizeSection}>
-              <label className={styles.sizeLabel}>ราคา (ต่อไซส์)</label>
-              <div className={styles.sizeInputs}>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>S (฿)</label>
-                  <input
-                    type="number"
-                    name="price_S"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.price_S}
-                    onChange={handleChange}
-                    inputMode="decimal"
-                    min={0}
-                    step="any"
-                  />
-                </div>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>M (฿)</label>
-                  <input
-                    type="number"
-                    name="price_M"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.price_M}
-                    onChange={handleChange}
-                    inputMode="decimal"
-                    min={0}
-                    step="any"
-                  />
-                </div>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>L (฿)</label>
-                  <input
-                    type="number"
-                    name="price_L"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.price_L}
-                    onChange={handleChange}
-                    inputMode="decimal"
-                    min={0}
-                    step="any"
-                  />
-                </div>
-                <div className={styles.sizeField}>
-                  <label className={styles.sizeFieldLabel}>XL (฿)</label>
-                  <input
-                    type="number"
-                    name="price_XL"
-                    className={styles.sizeInput}
-                    placeholder="0"
-                    value={form.price_XL}
-                    onChange={handleChange}
-                    inputMode="decimal"
-                    min={0}
-                    step="any"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* รายละเอียดสินค้า */}
-            <div className={styles.field}>
-              <textarea
-                name="description"
-                className={`${styles.input} ${styles.textarea}`}
-                placeholder=" "
-                value={form.description}
-                onChange={handleChange}
-                aria-label="รายละเอียดสินค้า"
-              />
-              <label className={styles.label}>รายละเอียดสินค้า</label>
-            </div>
-
-            {/* หมวดหมู่ (ถ้าอยากใช้ต่อ) */}
+            {/* หมวดหมู่ */}
             <div className={styles.field}>
               <input
                 type="text"
@@ -395,10 +261,68 @@ export default function AddProductAdminPage() {
                 accept="image/*"
               />
               <span>
-                อัปโหลดรูปภาพ{images ? ` (${images.length} ไฟล์)` : ''}
+                อัปโหลดรูป{images ? ` (${images.length} ไฟล์)` : ''}
               </span>
               <span className={styles.icon}>📤</span>
             </label>
+
+            {/* ตารางกรอก Size / Price / Stock */}
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Size</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SIZES.map((sz) => (
+                    <tr key={sz}>
+                      <td className={styles.cellCenter}>{sz}</td>
+                      <td>
+                        <input
+                          type="number"
+                          name={`price_${sz}`}
+                          className={styles.input}
+                          placeholder="0"
+                          value={form[`price_${sz}` as keyof FormState]}
+                          onChange={handleChange}
+                          inputMode="decimal"
+                          min={0}
+                          step="any"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          name={`stock_${sz}`}
+                          className={styles.input}
+                          placeholder="0"
+                          value={form[`stock_${sz}` as keyof FormState]}
+                          onChange={handleChange}
+                          inputMode="numeric"
+                          min={0}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* รายละเอียดสินค้า */}
+            <div className={styles.field}>
+              <textarea
+                name="description"
+                className={`${styles.input} ${styles.textarea}`}
+                placeholder=" "
+                value={form.description}
+                onChange={handleChange}
+                aria-label="รายละเอียดสินค้า"
+              />
+              <label className={styles.label}>รายละเอียดสินค้า</label>
+            </div>
 
             {message && (
               <p style={{ color: message.startsWith('✅') ? 'green' : 'red' }}>

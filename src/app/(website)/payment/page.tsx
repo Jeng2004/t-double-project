@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import styles from './Order-details.module.css';
+import styles from './payment.module.css';
 import Image from 'next/image';
 import Navbar from '../components/Navbar';
 import { getUserIdForFrontend } from '@/lib/get-user-id';

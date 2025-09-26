@@ -28,6 +28,11 @@ export default function NavbarAdmin() {
             Order
           </button>
           <button
+            onClick={() => router.push('/return_requests')}
+            className="hover:underline focus:outline-none">
+            return_requests
+          </button>
+          <button
             onClick={() => router.push('/stock-admin')}
             className="hover:underline focus:outline-none">
             Products in stock
@@ -39,7 +44,6 @@ export default function NavbarAdmin() {
           </button>
         </div>
       </div>
-
       {/* ไอคอนฝั่งขวา */}
       <div className="flex items-center space-x-6 text-lg">
         <FaUserCircle

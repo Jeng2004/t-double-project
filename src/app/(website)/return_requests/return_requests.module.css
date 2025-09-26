@@ -1,0 +1,70 @@
+.page { padding: 24px 24px 48px; background: #fff; }
+
+.header {
+  display: flex; flex-wrap: wrap;
+  align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.title { font-weight: 900; font-size: 18px; color: #222; margin: 0; }
+
+.filters { display: flex; gap: 10px; align-items: center; margin-left: auto; }
+
+.searchWrap { position: relative; width: 380px; max-width: 100%; }
+.searchIcon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; opacity: .6; }
+.search {
+  width: 100%; padding: 10px 12px 10px 30px;
+  border: 1px solid #ddd; border-radius: 8px; background: #fafafa; font-weight: 600;
+}
+
+.select {
+  padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; font-weight: 700;
+}
+
+.loading { color: #444; }
+.error { color: #c00; }
+
+/* ตาราง */
+.tableWrap { border: 1px solid #eee; border-radius: 10px; overflow: hidden; background: #fff; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table thead tr { background: #f0f0f0; }
+.table th, .table td { padding: 12px 14px; border-bottom: 1px solid #f4f4f4; text-align: left; vertical-align: top; }
+.empty { text-align: center; color: #888; padding: 20px; }
+
+.cellCenter { text-align: center; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+/* ป้ายสถานะ */
+.pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pillPending  { background: #fff7e6; color: #d46b08; border-color: #ffe7ba; }
+.pillApproved { background: #f6ffed; color: #389e0d; border-color: #b7eb8f; }
+.pillRejected { background: #fff1f0; color: #cf1322; border-color: #ffa39e; }
+
+/* จุกจิก */
+.subtle { font-size: 12px; color: #777; }
+.link {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0969da;
+  text-decoration: none;
+}
+.link:hover { text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 860px) {
+  .filters { width: 100%; justify-content: space-between; }
+  .searchWrap { flex: 1; min-width: 200px; }
+  .select { white-space: nowrap; }
+}
+
+@media (max-width: 680px) {
+  .table th:nth-child(3), .table td:nth-child(3) { display: none; } /* ซ่อน Customer บนจอเล็ก */
+}
