@@ -7,7 +7,6 @@
   color: #222;
 }
 
-/* กล่อง Order */
 .orderList {
   display: flex;
   flex-direction: column;
@@ -18,11 +17,10 @@
   border: 1px solid #eee;
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
-/* Header */
 .orderHeader {
   padding: 14px 16px 10px;
   background: #fafafa;
@@ -52,6 +50,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .headerDate {
@@ -59,7 +58,6 @@
   color: #666;
 }
 
-/* รายการสินค้าในออเดอร์ */
 .items {
   padding: 10px 16px 14px;
   display: flex;
@@ -69,29 +67,35 @@
 
 .orderItem {
   display: grid;
-  grid-template-columns: 60px 1fr auto;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
+  padding: 12px 0;
   border-bottom: 1px solid #f2f2f2;
 }
+
 .orderItem:last-child {
   border-bottom: none;
 }
 
 .thumb {
+  width: 60px;
+  height: 60px;
+  display: block;
+  object-fit: cover;
+  object-position: center;
   border-radius: 8px;
   border: 1px solid #eee;
   background: #fff;
 }
 
-.meta { min-width: 0; }
+.meta {
+  min-width: 0;
+  overflow: hidden;
+}
 
-.productName {
-  font-weight: 700;
-  margin: 0;
-  font-size: 15px;
-  color: #222;
+.productName,
+.productDetail {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -109,52 +113,71 @@
   color: #111;
 }
 
-/* Badge สถานะ */
 .status {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
+  border: 1px solid transparent;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 280px;
 }
 
-.statusPending {         /* รอดำเนินการ */
+.specialBadge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7a2e00;
+  background: #fff7e6;
+  border: 1px solid #ffe7ba;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.statusPayWait {
+  background: #fff7e6;
+  color: #ad6800;
+  border-color: #ffe7ba;
+}
+
+.statusPending {
   background: #fff1f0;
   color: #d4380d;
-  border: 1px solid #ffd8bf;
+  border-color: #ffd8bf;
 }
 
-.statusPreparing {       /* กำลังเตรียมสินค้า */
+.statusPreparing {
   background: #fffbe6;
   color: #b36b00;
-  border: 1px solid #ffe58f;
+  border-color: #ffe58f;
 }
 
-.statusShipping {        /* กำลังจัดส่ง */
+.statusShipping {
   background: #e6f4ff;
   color: #0958d9;
-  border: 1px solid #bae0ff;
+  border-color: #bae0ff;
 }
 
-.statusSuccess {         /* จัดส่งสำเร็จ */
+.statusSuccess {
   background: #f6ffed;
   color: #389e0d;
-  border: 1px solid #b7eb8f;
+  border-color: #b7eb8f;
 }
 
-.statusCancel {          /* ยกเลิก */
+.statusReturn {
+  background: #f0f5ff;
+  color: #1d39c4;
+  border-color: #adc6ff;
+}
+
+.statusCancel {
   background: #fff1f0;
   color: #cf1322;
-  border: 1px solid #ffa39e;
-}
-
-/* responsive เล็กน้อย */
-@media (max-width: 560px) {
-  .orderItem {
-    grid-template-columns: 50px 1fr auto;
-    gap: 10px;
-  }
-  .price { font-size: 13px; }
+  border-color: #ffa39e;
 }
 
 .productExtraLink {
@@ -169,4 +192,16 @@
 
 .productExtraLink:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+  .orderItem {
+    grid-template-columns: 50px minmax(0, 1fr) auto;
+  }
+  .status {
+    max-width: 180px;
+  }
+  .price {
+    font-size: 13px;
+  }
 }

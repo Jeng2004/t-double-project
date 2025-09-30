@@ -6,23 +6,6 @@ import styles from './Special-Size.module.css';
 import Navbar from '../components/Navbar';
 import { getUserIdForFrontend } from '@/lib/get-user-id';
 
-type PostBody = {
-  userId?: string;
-  email?: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  address: string;
-  productType: string;
-  model: string;
-  quantity: number;
-  sizeLabel: string;
-  chest: number;
-  length: number;
-  notes?: string | null;
-  status?: string;
-};
-
 type Mode = 'preset' | 'custom';
 
 export default function SpecialSizePage() {
@@ -35,9 +18,10 @@ export default function SpecialSizePage() {
   const [email, setEmail]         = useState('');
   const [address, setAddress]     = useState('');
 
-  const [productType, setProductType] = useState('');
-  const [model, setModel]             = useState('');
-  const [quantity, setQuantity]       = useState<number | ''>('');
+  const [category, setCategory] = useState('เสื้อยืด');       // เดิม productType
+  const [productName, setProductName] = useState('');          // เดิม model
+  const [color, setColor] = useState('');                      // ★ เพิ่ม เพื่อแมปกับ API ใหม่
+  const [quantity, setQuantity] = useState<number | ''>('');
 
   const [mode, setMode]             = useState<Mode>('preset');
   const [presetSize, setPresetSize] = useState('2XL');
@@ -70,21 +54,37 @@ export default function SpecialSizePage() {
     return () => { ignore = true; };
   }, [userId]);
 
-  const sizeLabel = useMemo(() => (mode === 'preset' ? presetSize : 'custom'), [mode, presetSize]);
+  const sizeDetail = useMemo(() => {
+    if (mode === 'preset') {
+      // ถ้ากรอกหมายเหตุ จะผูกไปใน sizeDetail ด้วยเพื่อไม่ทิ้งข้อมูล
+      return notes.trim()
+        ? `preset:${presetSize} | notes:${notes.trim()}`
+        : `preset:${presetSize}`;
+    } else {
+      const c = typeof chest === 'number' ? chest : Number(chest || 0);
+      const l = typeof length === 'number' ? length : Number(length || 0);
+      return notes.trim()
+        ? `custom:chest=${c}in,length=${l}in | notes:${notes.trim()}`
+        : `custom:chest=${c}in,length=${l}in`;
+    }
+  }, [mode, presetSize, chest, length, notes]);
 
   const qtyNumber = typeof quantity === 'number' ? quantity : Number(quantity || 0);
-  const validQty  = Number.isFinite(qtyNumber) && qtyNumber >= 10;
+  const validQty  = Number.isFinite(qtyNumber) && qtyNumber >= 5; // ★ ตาม API ใหม่ (ขั้นต่ำ 5)
 
-  // ✅ ผ่อนเงื่อนไข: ไม่บังคับอีเมลหรือ userId เพื่อให้ "กดส่ง" ได้ก่อน
+  // ต้องมี userId + email เพราะ API ฝั่ง POST บังคับทั้งคู่
   const canSubmit = useMemo(() => {
     const baseFilled =
       firstName.trim() &&
       lastName.trim() &&
       phone.trim() &&
+      email.trim() &&
       address.trim() &&
-      productType.trim() &&
-      model.trim() &&
-      validQty;
+      category.trim() &&
+      productName.trim() &&
+      color.trim() &&
+      validQty &&
+      !!userId;
 
     if (!baseFilled) return false;
 
@@ -95,17 +95,19 @@ export default function SpecialSizePage() {
       const l = typeof length === 'number' ? length : Number(length || 0);
       return c > 0 && l > 0;
     }
-  }, [firstName, lastName, phone, address, productType, model, validQty, mode, presetSize, chest, length]);
+  }, [firstName, lastName, phone, email, address, category, productName, color, validQty, userId, mode, presetSize, chest, length]);
 
-  // แสดงเหตุผลที่ปุ่มยัง disabled (ช่วยดีบั๊ก)
   const disabledReason = useMemo(() => {
+    if (!userId)           return 'กรุณาเข้าสู่ระบบก่อนทำรายการ';
     if (!firstName.trim()) return 'กรอกชื่อ';
     if (!lastName.trim())  return 'กรอกนามสกุล';
     if (!phone.trim())     return 'กรอกเบอร์โทร';
+    if (!email.trim())     return 'กรอกอีเมล';
     if (!address.trim())   return 'กรอกที่อยู่';
-    if (!productType.trim()) return 'กรอกประเภทสินค้า';
-    if (!model.trim())       return 'กรอกรุ่นสินค้า';
-    if (!validQty)           return 'จำนวนขั้นต่ำ 10 ตัว';
+    if (!category.trim())  return 'กรอกประเภทสินค้า';
+    if (!productName.trim()) return 'กรอกรุ่นสินค้า';
+    if (!color.trim())     return 'กรอกสีหรือโทนสีสินค้า';
+    if (!validQty)         return 'จำนวนขั้นต่ำ 5 ตัว';
     if (mode === 'preset' && !presetSize.trim()) return 'ระบุชื่อไซส์ (เช่น 2XL)';
     if (mode === 'custom') {
       const c = typeof chest === 'number' ? chest : Number(chest || 0);
@@ -114,11 +116,12 @@ export default function SpecialSizePage() {
       if (!(l > 0)) return 'ระบุความยาว (นิ้ว)';
     }
     return '';
-  }, [firstName, lastName, phone, address, productType, model, validQty, mode, presetSize, chest, length]);
+  }, [userId, firstName, lastName, phone, email, address, category, productName, color, validQty, mode, presetSize, chest, length]);
 
   const resetForm = () => {
-    setProductType('');
-    setModel('');
+    setCategory('เสื้อยืด');
+    setProductName('');
+    setColor('');
     setQuantity('');
     setMode('preset');
     setPresetSize('2XL');
@@ -131,12 +134,6 @@ export default function SpecialSizePage() {
     e.preventDefault();
     if (submitting) return;
 
-    // ✅ ตรวจเรื่องอีเมล/ผู้ใช้ตอนส่งจริง (ถ้าไม่มีทั้งสอง → เตือน)
-    if (!userId && !email.trim()) {
-      setMessage('❌ กรุณากรอกอีเมล หรือเข้าสู่ระบบก่อนส่งคำสั่งซื้อ');
-      return;
-    }
-
     if (!canSubmit) {
       setMessage(`❌ กรุณากรอกข้อมูลให้ครบถ้วน (${disabledReason || 'กรอกไม่ครบ'})`);
       return;
@@ -146,24 +143,19 @@ export default function SpecialSizePage() {
       setSubmitting(true);
       setMessage(null);
 
-      const c = typeof chest === 'number' ? chest : Number(chest || 0);
-      const l = typeof length === 'number' ? length : Number(length || 0);
-
-      const payload: PostBody = {
-        userId: userId || undefined,
-        email: email || undefined,
+      // โหลดข้อมูลตาม API ใหม่
+      const payload = {
+        userId,
+        email: email.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
         address: address.trim(),
-        productType: productType.trim(),
-        model: model.trim(),
+        category: category.trim(),         // เดิม productType
+        productName: productName.trim(),   // เดิม model
+        color: color.trim(),               // ★ เพิ่มฟิลด์
         quantity: qtyNumber,
-        sizeLabel,
-        chest: mode === 'custom' ? c : c || 0,
-        length: mode === 'custom' ? l : l || 0,
-        notes: notes.trim() ? notes.trim() : undefined,
-        status: 'pending',
+        sizeDetail,                        // รวม preset/custom (+ notes) ไว้แล้ว
       };
 
       const res = await fetch('/api/special-orders', {
@@ -210,7 +202,7 @@ export default function SpecialSizePage() {
                 <input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div className={styles.field}>
-                <label>อีเมล (ถ้าไม่ได้เข้าสู่ระบบ)</label>
+                <label>อีเมล</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
             </div>
@@ -223,17 +215,21 @@ export default function SpecialSizePage() {
             <h3 className={styles.sectionTitle}>รายละเอียดสินค้า</h3>
             <div className={styles.field}>
               <label>ประเภทสินค้า</label>
-              <input value={productType} onChange={(e) => setProductType(e.target.value)} />
+              <input value={category} onChange={(e) => setCategory(e.target.value)} />
             </div>
             <div className={styles.field}>
               <label>รุ่นสินค้า</label>
-              <input value={model} onChange={(e) => setModel(e.target.value)} />
+              <input value={productName} onChange={(e) => setProductName(e.target.value)} />
             </div>
             <div className={styles.field}>
-              <label>จำนวนที่ต้องการ (ขั้นต่ำ 10)</label>
+              <label>สี/โทนสี</label>
+              <input value={color} onChange={(e) => setColor(e.target.value)} placeholder="เช่น ดำ / ขาว / กรมท่า" />
+            </div>
+            <div className={styles.field}>
+              <label>จำนวนที่ต้องการ (ขั้นต่ำ 5)</label>
               <input
                 type="number"
-                min={10}
+                min={5}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
               />
@@ -243,7 +239,7 @@ export default function SpecialSizePage() {
             <div className={styles.segment}>
               <label className={styles.radio}>
                 <input type="radio" name="sizemode" checked={mode === 'preset'} onChange={() => setMode('preset')} />
-                <span>เลือกลำดับ “ไซส์”</span>
+                <span>เลือก “ไซส์ตั้งต้น”</span>
               </label>
               <label className={styles.radio}>
                 <input type="radio" name="sizemode" checked={mode === 'custom'} onChange={() => setMode('custom')} />
@@ -289,7 +285,7 @@ export default function SpecialSizePage() {
             </div>
 
             <div className={styles.policy}>
-              <div>การรับขั้นต่ำ 10 ตัวขึ้นไปสำหรับไซส์พิเศษ</div>
+              <div>สั่งขั้นต่ำ 5 ตัวขึ้นไปสำหรับไซส์พิเศษ</div>
               <div>ระยะเวลาดำเนินการประมาณ 7–14 วัน</div>
               <div>โปรดตรวจสอบข้อมูลขนาดและรายละเอียดให้ครบถ้วนก่อนส่ง</div>
             </div>
@@ -297,7 +293,7 @@ export default function SpecialSizePage() {
             {message && (
               <div className={message.startsWith('✅') ? styles.msgOk : styles.msgErr}>{message}</div>
             )}
-            {!canSubmit && !message && disabledReason && (
+            {!canSubmit && !message && (
               <div className={styles.msgErr}>กรุณาแก้ไข: {disabledReason}</div>
             )}
 

@@ -1,0 +1,94 @@
+.page { background: #f5f5f5; min-height: 100vh; }
+.container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; background: #fff; border-radius: 12px; }
+
+.title { font-size: 24px; font-weight: 800; margin-bottom: 20px; color: #222; }
+
+/* ตารางข้อมูลหลัก */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  row-gap: 10px;
+  column-gap: 16px;
+  margin-bottom: 16px;
+}
+.badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  background: #fffbe6;
+  color: #b36b00;
+  border: 1px solid #ffe58f;
+}
+
+/* หัวข้อ */
+.sectionTitle { font-size: 18px; font-weight: 800; margin: 18px 0 12px; color: #222; }
+
+/* กล่องสินค้า */
+.itemRow {
+  display: grid;
+  grid-template-columns: 120px 1fr 240px;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fafafa;
+}
+.thumb { border-radius: 8px; border: 1px solid #eee; background: #fff; }
+.itemMeta { min-width: 0; }
+.itemName { font-weight: 800; font-size: 16px; margin-bottom: 4px; color: #111; }
+.itemSub { font-size: 14px; color: #666; margin-bottom: 4px; }
+.itemNote { font-size: 13px; color: #888; }
+.itemPrice { text-align: right; }
+.priceInput { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; background: #fff; }
+.totalSmall { font-size: 13px; color: #444; margin: 6px 0 10px; }
+
+/* ปุ่ม */
+.actions { display: flex; gap: 12px; margin-top: 24px; }
+.btnPrimary {
+  background: #111; color: #fff; padding: 10px 14px; border: none;
+  border-radius: 8px; font-weight: 900; cursor: pointer; width: 100%;
+}
+.btnGhost {
+  background: #111; color: #fff; padding: 10px 14px; border: none;
+  border-radius: 8px; font-weight: 900; cursor: pointer;
+}
+.btnOutline {
+  background: #fff; color: #111; padding: 10px 14px; border: 1px solid #ddd;
+  border-radius: 8px; font-weight: 800; cursor: pointer;
+}
+.linkBtn {
+  display: inline-block;
+  margin-top: 8px;
+  color: #0a58ca;
+  text-decoration: underline;
+}
+
+/* อัปเดตสถานะ */
+.statusRow {
+  display: flex; gap: 8px; align-items: center;
+}
+.select {
+  width: 280px; max-width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px;
+}
+
+/* การ์ดข้อมูลลูกค้า */
+.recipientCard { border: 1px solid #ddd; border-radius: 10px; padding: 16px; background: #fff; margin-top: 10px; }
+.recRow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 10px; }
+.recRow:last-child { margin-bottom: 0; }
+.recCol { min-width: 0; }
+.recLabel { color: #666; font-weight: 600; margin-bottom: 4px; }
+.recValue { color: #111; font-weight: 700; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .itemRow { grid-template-columns: 100px 1fr; }
+  .itemPrice { text-align: left; }
+}
+@media (max-width: 720px) {
+  .infoGrid { grid-template-columns: 1fr; }
+  .statusRow { flex-direction: column; align-items: stretch; }
+  .btnGhost { width: 100%; }
+}

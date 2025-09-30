@@ -1,0 +1,27 @@
+.page { padding: 24px; background: #fff; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.title { font-size: 20px; font-weight: 800; }
+.searchWrap { position: relative; width: 300px; }
+.searchIcon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); }
+.search { width: 100%; padding: 8px 10px 8px 30px; border: 1px solid #ddd; border-radius: 8px; }
+
+.tableWrap { border: 1px solid #eee; border-radius: 8px; overflow: hidden; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { padding: 10px 14px; border-bottom: 1px solid #f4f4f4; text-align: left; }
+.empty { text-align: center; color: #888; }
+
+.pill { padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; cursor: pointer; }
+.pillCancelled { background: #ffe9e9; color: #cf1322; }
+.pillUnpaid { background: #fff7e6; color: #d46b08; }
+.pillPending { background: #f0f0f0; color: #595959; }
+.pillPreparing { background: #e6f0ff; color: #1d4ed8; }
+.pillShipping { background: #fff1e6; color: #d46b08; }
+.pillCompleted { background: #edfff1; color: #389e0d; }
+
+.overlay { position: fixed; inset: 0; z-index: 50; }
+.popover { position: fixed; z-index: 60; width: 300px; background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.1); }
+.popList { display: grid; row-gap: 8px; }
+.popOption { display: flex; align-items: center; gap: 8px; }
+.popActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.btnPrimary { background: #111; color: #fff; padding: 6px 12px; border-radius: 8px; }
+.btnGhost { background: #f5f5f5; padding: 6px 12px; border-radius: 8px; }
