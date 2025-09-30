@@ -30,7 +30,17 @@ export default function NavbarAdmin() {
           <button
             onClick={() => router.push('/return_requests')}
             className="hover:underline focus:outline-none">
-            return_requests
+            Return_requests
+          </button>
+          <button
+            onClick={() => router.push('/Special-admin')}
+            className="hover:underline focus:outline-none">
+            Special
+          </button>
+          <button
+            onClick={() => router.push('/Special-return-admin')}
+            className="hover:underline focus:outline-none">
+            Special_return
           </button>
           <button
             onClick={() => router.push('/stock-admin')}

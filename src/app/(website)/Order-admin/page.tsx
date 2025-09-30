@@ -1,3 +1,4 @@
+// src/app/(website)/Order-admin/page.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -10,8 +11,7 @@ type AllowedStatus =
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
-  | 'จัดส่งสินค้าสำเร็จเเล้ว'
-  | 'กำลังจัดส่งคืนสินค้า'; // ✅ เพิ่มกลับมา
+  | 'จัดส่งสินค้าสำเร็จเเล้ว'; // ← ตัด 'กำลังจัดส่งคืนสินค้า' ออก
 
 type OrderItem = {
   id: string;
@@ -38,8 +38,7 @@ const STATUS_LIST: AllowedStatus[] = [
   'กำลังดำเนินการจัดเตรียมสินค้า',
   'กำลังดำเนินการจัดส่งสินค้า',
   'จัดส่งสินค้าสำเร็จเเล้ว',
-  'กำลังจัดส่งคืนสินค้า', // ✅ เพิ่มกลับมา
-];
+]; // ← ตัด 'กำลังจัดส่งคืนสินค้า' ออก
 
 const fmtTH = (iso: string, thai?: string | null) => {
   if (thai && thai.trim()) return thai;
@@ -174,7 +173,6 @@ export default function OrderAdmin2Page() {
       case 'กำลังดำเนินการจัดเตรียมสินค้า':
         return `${styles.pill} ${styles.pillPreparing}`;
       case 'กำลังดำเนินการจัดส่งสินค้า':
-      case 'กำลังจัดส่งคืนสินค้า': // ✅ ใช้สีเดียวกับ shipping
         return `${styles.pill} ${styles.pillShipping}`;
       case 'จัดส่งสินค้าสำเร็จเเล้ว':
       default:
@@ -212,7 +210,6 @@ export default function OrderAdmin2Page() {
       });
       if (!res.ok) throw new Error(`PATCH ${res.status}: ${await res.text()}`);
 
-      // update local state
       setRows((prev) =>
         prev.map((r) => (r.id === openForId ? { ...r, status: draftStatus } : r))
       );
@@ -224,7 +221,6 @@ export default function OrderAdmin2Page() {
     }
   };
 
-  // ---------- ไปหน้า Order details เมื่อคลิก ID ----------
   const goToDetails = (id: string) => {
     router.push(`/Order-details-admin/${encodeURIComponent(id)}`);
   };
@@ -307,7 +303,6 @@ export default function OrderAdmin2Page() {
         )}
       </div>
 
-      {/* Popover: เปลี่ยนสถานะ */}
       {openForId && (
         <>
           <div

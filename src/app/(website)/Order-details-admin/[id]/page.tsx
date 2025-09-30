@@ -1,3 +1,4 @@
+// src/app/(website)/Order-details-admin/[id]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -12,8 +13,7 @@ type AllowedStatus =
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
-  | 'จัดส่งสินค้าสำเร็จเเล้ว'
-  | 'กำลังจัดส่งคืนสินค้า';
+  | 'จัดส่งสินค้าสำเร็จเเล้ว'; // ← ตัด 'กำลังจัดส่งคืนสินค้า'
 
 type OrderItem = {
   id: string;
@@ -50,13 +50,25 @@ type OrderRow = {
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 const nf = (n: number) => { try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); } };
 
+// กันสถานะนอกลิสต์ให้เป็น 'รอดำเนินการ'
+const normalizeStatus = (s: unknown): AllowedStatus => {
+  const allowed: AllowedStatus[] = [
+    'ยกเลิก',
+    'รอดำเนินการ',
+    'กำลังดำเนินการจัดเตรียมสินค้า',
+    'กำลังดำเนินการจัดส่งสินค้า',
+    'จัดส่งสินค้าสำเร็จเเล้ว',
+  ];
+  const str = String(s ?? '');
+  return (allowed as string[]).includes(str) ? (str as AllowedStatus) : 'รอดำเนินการ';
+};
+
 const statusBadgeClass = (status: AllowedStatus) => {
   switch (status) {
     case 'รอดำเนินการ': return `${styles.badge} ${styles.badgePending}`;
     case 'กำลังดำเนินการจัดเตรียมสินค้า': return `${styles.badge} ${styles.badgePreparing}`;
     case 'กำลังดำเนินการจัดส่งสินค้า': return `${styles.badge} ${styles.badgeShipping}`;
     case 'จัดส่งสินค้าสำเร็จเเล้ว': return `${styles.badge} ${styles.badgeSuccess}`;
-    case 'กำลังจัดส่งคืนสินค้า': return `${styles.badge} ${styles.badgeReturn}`;
     case 'ยกเลิก':
     default: return `${styles.badge} ${styles.badgeCancel}`;
   }
@@ -107,7 +119,7 @@ export default function OrderDetailsAdminPage() {
         const mapped: OrderRow = {
           id: String(data.id ?? ''),
           trackingId: data.trackingId ?? null,
-          status: (data.status as AllowedStatus) ?? 'รอดำเนินการ',
+          status: normalizeStatus(data.status), // ← ปรับให้ปลอดภัย
           createdAt: String(data.createdAt ?? ''),
           createdAtThai: data.createdAtThai ?? null,
           totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : null,
@@ -134,7 +146,6 @@ export default function OrderDetailsAdminPage() {
     return () => { ignore = true; };
   }, [id]);
 
-  const createdAtDisplay = order?.createdAtThai ?? order?.createdAt ?? '';
   const orderTotal = useMemo(() => {
     if (!order) return 0;
     if (typeof order.totalAmount === 'number') return order.totalAmount;
@@ -155,7 +166,7 @@ export default function OrderDetailsAdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'อัปเดตสถานะไม่สำเร็จ');
-      setOrder((prev) => prev ? { ...prev, status: data.order?.status ?? status } : prev);
+      setOrder((prev) => prev ? { ...prev, status: normalizeStatus(data.order?.status ?? status) } : prev);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'อัปเดตสถานะไม่สำเร็จ');
     } finally {
@@ -163,15 +174,26 @@ export default function OrderDetailsAdminPage() {
     }
   }
 
-  const canConfirm = order?.status === 'รอดำเนินการ';
-  const canCancel = order && order.status !== 'ยกเลิก' && order.status !== 'จัดส่งสินค้าสำเร็จเเล้ว';
+  if (loading) {
+    return (
+      <>
+        <NavbarAdmin />
+        <div className={styles.page}><div className={styles.container}>กำลังโหลด…</div></div>
+      </>
+    );
+  }
+  if (err || !order) {
+    return (
+      <>
+        <NavbarAdmin />
+        <div className={styles.page}><div className={styles.container}><div className={styles.error}>❌ {err || 'ไม่พบคำสั่งซื้อ'}</div></div></div>
+      </>
+    );
+  }
 
-  if (loading) return <div className={styles.page}><div className={styles.container}>กำลังโหลด…</div></div>;
-  if (err || !order) return <div className={styles.page}><div className={styles.container}><div className={styles.error}>❌ {err || 'ไม่พบคำสั่งซื้อ'}</div></div></div>;
-
-  // ---- Payment (จำลองตามที่กำหนด) ----
   const paymentMethod = 'บัตร / QR (จำลอง)';
-  const paymentStatus = order.status === 'รอดำเนินการ' || order.status === 'ยกเลิก' ? 'รอตรวจสอบ' : 'ชำระแล้ว';
+  const paymentStatus =
+    order.status === 'รอดำเนินการ' || order.status === 'ยกเลิก' ? 'รอตรวจสอบ' : 'ชำระแล้ว';
 
   return (
     <>
@@ -190,7 +212,7 @@ export default function OrderDetailsAdminPage() {
             </div>
           </div>
 
-          {/* 1.1) ข้อมูลลูกค้า — เป็นกล่องเหมือนเดิม */}
+          {/* 1.1 ข้อมูลลูกค้า */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลลูกค้า</h3>
             <div className={styles.recipientCard}>
@@ -274,7 +296,7 @@ export default function OrderDetailsAdminPage() {
 
           {/* ปุ่ม */}
           <div className={styles.actions}>
-            {/* ถ้าเป็น "รอดำเนินการ" ให้กด Confirm หรือ Cancel */}
+            {/* เฉพาะ 'รอดำเนินการ' ให้กด Confirm/Cancel */}
             {order.status === 'รอดำเนินการ' && (
               <>
                 <button
@@ -300,6 +322,5 @@ export default function OrderDetailsAdminPage() {
         </div>
       </div>
     </>
-
   );
 }

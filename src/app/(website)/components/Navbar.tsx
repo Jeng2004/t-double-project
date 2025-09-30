@@ -54,6 +54,7 @@ export default function Navbar() {
           <button onClick={() => router.push('/')} className="hover:underline focus:outline-none">HOME</button>
           <button onClick={() => router.push('/tee')} className="hover:underline focus:outline-none">TEE</button>
           <button onClick={() => router.push('/sweats')} className="hover:underline focus:outline-none">SWEATS</button>
+          <button onClick={() => router.push('/Special')} className="hover:underline focus:outline-none">Special</button>
         </div>
       </div>
 

@@ -1,0 +1,94 @@
+/* ✅ Container หลัก – จัดทุกอย่างกลางจอ */
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* กึ่งกลางแนวตั้งด้วย */
+  min-height: calc(100vh - 120px); /* เผื่อมี navbar ด้านบน */
+  padding: 60px 20px;
+  background: #fff;
+  text-align: center;
+}
+
+/* ✅ วงกลมติ๊กถูก – อยู่กลางแน่นอน */
+.checkIcon {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 4px solid #28a745;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+  color: #28a745;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+}
+
+/* ✅ ข้อความหลัก */
+.title {
+  font-size: 30px;
+  font-weight: 900;
+  margin-bottom: 12px;
+  color: #111;
+}
+
+.subtitle {
+  color: #555;
+  font-size: 16px;
+  margin-bottom: 36px;
+  line-height: 1.6;
+}
+
+/* ✅ แสดงรหัสคำสั่งซื้อ */
+.session {
+  font-size: 15px;
+  color: #333;
+  margin-bottom: 36px;
+}
+
+.session span {
+  font-weight: bold;
+  word-break: break-all;
+  font-family: monospace;
+  background: #f8f8f8;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* ✅ ปุ่ม */
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s ease;
+}
+
+.primaryBtn {
+  background: #111;
+  color: #fff;
+}
+
+.primaryBtn:hover {
+  background: #222;
+}
+
+.secondaryBtn {
+  background: #f3f3f3;
+  color: #333;
+}
+
+.secondaryBtn:hover {
+  background: #e2e2e2;
+}

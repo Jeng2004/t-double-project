@@ -1,0 +1,112 @@
+.page { padding: 24px 24px 48px; background: #fff; }
+
+.header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.title { font-weight: 900; font-size: 18px; color: #222; margin: 0; }
+
+.searchWrap { position: relative; width: 360px; max-width: 100%; }
+.searchIcon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; opacity: .6; }
+.search {
+  width: 100%; padding: 10px 12px 10px 30px;
+  border: 1px solid #ddd; border-radius: 8px; background: #fafafa; font-weight: 600;
+}
+
+.loading { color: #444; }
+.error { color: #c00; }
+
+/* ตาราง */
+.tableWrap { border: 1px solid #eee; border-radius: 10px; overflow: hidden; background: #fff; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table thead tr { background: #f0f0f0; }
+.table th, .table td { padding: 12px 14px; border-bottom: 1px solid #f4f4f4; text-align: left; vertical-align: top; }
+.empty { text-align: center; color: #888; padding: 20px; }
+
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+/* ป้ายสถานะ */
+.pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pillPending  { background: #f2f2f2; color: #595959; border-color: #e0e0e0; }
+.pillApproved { background: #edfff1; color: #389e0d; border-color: #b7eb8f; }
+.pillRejected { background: #ffe9e9; color: #cf1322; border-color: #ffc8c8; }
+
+.btnSmall {
+  background: #111; color: #fff; border: none; border-radius: 8px;
+  padding: 8px 12px; font-weight: 900; cursor: pointer;
+}
+
+/* Drawer */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.15);
+  z-index: 60;
+}
+
+.drawer {
+  position: fixed;
+  right: 0; top: 0; bottom: 0;
+  width: min(540px, 100%);
+  background: #fff;
+  box-shadow: -8px 0 30px rgba(0,0,0,.15);
+  z-index: 70;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.drawerHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 14px 16px; border-bottom: 1px solid #eee;
+}
+.drawerTitle { font-weight: 900; color: #222; }
+.close {
+  background: transparent; border: none; font-size: 18px; cursor: pointer;
+}
+
+.drawerBody { padding: 16px; overflow: auto; }
+.drawerActions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 16px; border-top: 1px solid #eee;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  row-gap: 10px; column-gap: 12px;
+}
+.k { color: #666; font-weight: 600; }
+.v { color: #111; font-weight: 700; }
+.dim { color: #777; font-weight: 600; font-size: 12px; }
+
+.thumbGrid { display: grid; grid-template-columns: repeat(auto-fill, 92px); gap: 8px; }
+.thumb {
+  border-radius: 8px; border: 1px solid #eee; background: #fff;
+  object-fit: cover;
+}
+
+.divider { height: 1px; background: #eee; margin: 16px 0; }
+
+.noteBlock { display: grid; gap: 6px; }
+.noteLabel { font-weight: 800; color: #222; }
+.textarea {
+  width: 100%; min-height: 96px; padding: 10px 12px;
+  border: 1px solid #ddd; border-radius: 8px; resize: vertical; background: #fff; font: inherit;
+}
+
+.btn {
+  padding: 10px 16px; border-radius: 8px; font-weight: 900;
+  border: 1px solid transparent; cursor: pointer;
+}
+.btnApprove { background: #111; color: #fff; }
+.btnReject  { background: #b91c1c; color: #fff; border-color: #fecaca; }
+
+@media (max-width: 720px) {
+  .searchWrap { flex: 1; }
+  .kv { grid-template-columns: 1fr; }
+}
