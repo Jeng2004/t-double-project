@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import PDFDocument from "pdfkit";
-import { PrismaClient } from "@prisma/client";
-import nodemailer from "nodemailer";
-import fs from "fs";
-import path from "path";
+import { PrismaClient } from '@prisma/client';
+import { PDFDocument } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+import fs from 'fs';
+import path from 'path';
 
-const prisma = new PrismaClient();
-
-/** ฟังก์ชันแปลงเวลาเป็นเวลาไทย */
+// ฟังก์ชันแปลงเวลาเป็นเวลาไทย
 function formatToThaiTime(date: Date) {
   return new Date(date).toLocaleString("th-TH", {
     timeZone: "Asia/Bangkok",
@@ -15,105 +13,66 @@ function formatToThaiTime(date: Date) {
   });
 }
 
-/** ฟังก์ชันสร้าง PDF สลิป */
-async function generateSlip(order: any): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    try {
-      const buffers: Buffer[] = [];
-      const fontPath = path.join(
-        process.cwd(),
-        "public",
-        "fonts",
-        "NotoSansThai-Regular.ttf"
+// ฟังก์ชันสร้าง PDF สลิปจากเทมเพลต
+async function generateSlipFromTemplate(order: any): Promise<Buffer> {
+  try {
+    // โหลดเทมเพลต PDF
+    const templatePath = path.join(process.cwd(), "public", "template", "ใบเสร็จ (1).pdf");
+    const templateBytes = fs.readFileSync(templatePath);
+
+    const pdfDoc = await PDFDocument.load(templateBytes);
+
+    // Register fontkit เพื่อรองรับฟอนต์ custom
+    pdfDoc.registerFontkit(fontkit);
+
+    // เข้าถึงหน้าของ PDF
+    const page = pdfDoc.getPages()[0];
+
+    // กำหนดฟอนต์
+    const fontPath = path.join(process.cwd(), "public", "fonts", "NotoSansThai-Regular.ttf");
+    const fontBytes = fs.readFileSync(fontPath);
+    const font = await pdfDoc.embedFont(fontBytes);
+
+    // เติมข้อมูลลงในตำแหน่งต่างๆ
+    page.drawText(`หมายเลขออเดอร์: ${order.id}`, { x: 150, y: 720, font, size: 12 });
+    page.drawText(`Tracking ID: ${order.trackingId}`, { x: 150, y: 705, font, size: 12 });
+    page.drawText(`ลูกค้า: ${order.user?.name ?? "-"}`, { x: 150, y: 690, font, size: 12 });
+    page.drawText(`อีเมล: ${order.user?.email ?? "-"}`, { x: 150, y: 675, font, size: 12 });
+    page.drawText(`วันที่: ${formatToThaiTime(order.createdAt)}`, { x: 150, y: 660, font, size: 12 });
+
+    // เติมข้อมูลรายการสินค้า
+    let yPosition = 635;
+    order.orderItems.forEach((item: any, index: number) => {
+      page.drawText(
+        `${index + 1}. ${item.product.name} (${item.size}) x ${item.quantity} - ${item.totalPrice.toLocaleString()} บาท`,
+        { x: 150, y: yPosition, font, size: 12 }
       );
+      yPosition -= 15;
+    });
 
-      if (!fs.existsSync(fontPath)) {
-        throw new Error("❌ ไม่พบฟอนต์ NotoSansThai-Regular.ttf ที่ public/fonts/");
-      }
+    // เติมยอดรวม
+    page.drawText(`ยอดรวมทั้งหมด: ${order.totalAmount.toLocaleString()} บาท`, { x: 150, y: yPosition, font, size: 14 });
 
-      const doc = new PDFDocument({
-        size: "A4",
-        margin: 50,
-        autoFirstPage: false, // ปิดการสร้างหน้าแรกอัตโนมัติ
-      });
+    // สร้าง Buffer ของ PDF ใหม่
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
 
-      doc.on("data", buffers.push.bind(buffers));
-      doc.on("end", () => resolve(Buffer.concat(buffers)));
-
-      // ✅ โหลดฟอนต์ไทย
-      doc.registerFont("NotoThai", fontPath);
-
-      // ✅ addPage โดยใช้ฟอนต์ไทยทันที
-      doc.addPage({ margin: 50 }).font("NotoThai");
-
-      // Header
-      doc.fontSize(20).text("ใบเสร็จรับเงิน / Payment Slip", { align: "center" });
-      doc.moveDown();
-
-      // Order Info
-      doc.fontSize(12).text(`หมายเลขออเดอร์: ${order.id}`);
-      doc.text(`Tracking ID: ${order.trackingId}`);
-      doc.text(`ลูกค้า: ${order.user?.name ?? "-"}`);
-      doc.text(`อีเมล: ${order.user?.email ?? "-"}`);
-      doc.text(`วันที่: ${formatToThaiTime(order.createdAt)}`);
-      doc.moveDown();
-
-      // รายการสินค้า
-      doc.fontSize(14).text("รายละเอียดสินค้า:");
-      doc.moveDown();
-
-      order.orderItems.forEach((item: any, index: number) => {
-        doc.fontSize(12).text(
-          `${index + 1}. ${item.product.name} (${item.size}) x ${item.quantity} - ${item.totalPrice.toLocaleString()} บาท`
-        );
-      });
-
-      doc.moveDown();
-      doc
-        .fontSize(14)
-        .text(`💰 ยอดรวมทั้งหมด: ${order.totalAmount.toLocaleString()} บาท`, {
-          align: "right",
-        });
-
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
-  });
+  } catch (error) {
+    throw new Error(`เกิดข้อผิดพลาดในการสร้างสลิป: ${error instanceof Error ? error.message : 'ไม่ระบุข้อผิดพลาด'}`);
+  }
 }
 
-/** ฟังก์ชันส่ง Email พร้อมแนบสลิป */
-async function sendSlipEmail(to: string, buffer: Buffer, orderId: string) {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  await transporter.sendMail({
-    from: `"T-Double" <${process.env.EMAIL_USER}>`,
-    to,
-    subject: `สลิปการชำระเงินสำหรับ Order #${orderId}`,
-    text: "กรุณาดูไฟล์สลิปที่แนบมา",
-    attachments: [
-      {
-        filename: `slip-${orderId}.pdf`,
-        content: buffer,
-      },
-    ],
-  });
-}
-
-/** API POST: สร้าง + ส่งสลิป */
+// ฟังก์ชันที่รองรับ HTTP POST method
 export async function POST(req: NextRequest) {
   try {
-    const { orderId } = await req.json();
+    const { orderId } = await req.json(); // ดึงข้อมูลจาก request body
 
     if (!orderId) {
       return NextResponse.json({ error: "ต้องระบุ orderId" }, { status: 400 });
     }
+
+    // ดึงข้อมูลออเดอร์จากฐานข้อมูล
+    const prisma = new PrismaClient();
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -123,22 +82,11 @@ export async function POST(req: NextRequest) {
     if (!order) {
       return NextResponse.json({ error: "ไม่พบคำสั่งซื้อ" }, { status: 404 });
     }
-    if (!order.isPaid) {
-      return NextResponse.json(
-        { error: "ออเดอร์นี้ยังไม่ได้ชำระเงิน" },
-        { status: 400 }
-      );
-    }
 
-    // ✅ Generate Slip
-    const pdfBuffer = await generateSlip(order);
+    // สร้างสลิป PDF จากเทมเพลต
+    const pdfBuffer = await generateSlipFromTemplate(order);
 
-    // ✅ ส่งอีเมล
-    if (order.user?.email) {
-      await sendSlipEmail(order.user.email, pdfBuffer, order.id);
-    }
-
-    // ✅ ส่ง PDF กลับไปใน response
+    // ส่งสลิป PDF กลับใน response
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
@@ -148,9 +96,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("❌ Error generating slip:", err);
-    return NextResponse.json(
-      { error: "ไม่สามารถสร้างสลิปได้" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "ไม่สามารถสร้างสลิปได้" }, { status: 500 });
   }
 }
