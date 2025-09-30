@@ -1,3 +1,4 @@
+// src/app/(website)/editstock/[id]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -36,10 +37,12 @@ export default function EditStockPage() {
   const [category, setCategory] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
 
-  const [priceBySize, setPriceBySize] = useState<PriceBySize>({
-    S: 0, M: 0, L: 0, XL: 0,
-  });
-  const [stockBySize, setStockBySize] = useState<StockBySize>({
+  // ค่าแก้ไขได้
+  const [priceBySize, setPriceBySize] = useState<PriceBySize>({ S: 0, M: 0, L: 0, XL: 0 });
+  const [stockBySize, setStockBySize] = useState<StockBySize>({ S: 0, M: 0, L: 0, XL: 0 });
+
+  // ✅ ค่าสต๊อกเดิมจากระบบ (ไว้แสดงใน “จำนวนสต๊อกที่เหลืออยู่” — ไม่เปลี่ยนตามการพิมพ์)
+  const [initialStockBySize, setInitialStockBySize] = useState<StockBySize>({
     S: 0, M: 0, L: 0, XL: 0,
   });
 
@@ -55,21 +58,30 @@ export default function EditStockPage() {
         const data: ProductRes = await res.json();
 
         setName(data.name ?? '');
-        setCategory((data.category as string) ?? '');
+        setCategory((data.category ?? '') || '');
         setImageUrls(Array.isArray(data.imageUrls) ? data.imageUrls : []);
 
-        setPriceBySize({
-          S: toNum((data.price as any)?.S ?? data.price),
-          M: toNum((data.price as any)?.M ?? data.price),
-          L: toNum((data.price as any)?.L ?? data.price),
-          XL: toNum((data.price as any)?.XL ?? data.price),
-        });
-        setStockBySize({
-          S: toNum((data.stock as any)?.S),
-          M: toNum((data.stock as any)?.M),
-          L: toNum((data.stock as any)?.L),
-          XL: toNum((data.stock as any)?.XL),
-        });
+        // ราคา รองรับทั้ง number เดี่ยวและ object รายไซส์
+        if (typeof data.price === 'number') {
+          const p = data.price;
+          setPriceBySize({ S: p, M: p, L: p, XL: p });
+        } else {
+          setPriceBySize({
+            S: toNum(data.price?.S),
+            M: toNum(data.price?.M),
+            L: toNum(data.price?.L),
+            XL: toNum(data.price?.XL),
+          });
+        }
+
+        const stockObj: StockBySize = {
+          S: toNum(data.stock?.S),
+          M: toNum(data.stock?.M),
+          L: toNum(data.stock?.L),
+          XL: toNum(data.stock?.XL),
+        };
+        setStockBySize(stockObj);         // ค่าแก้ไขได้
+        setInitialStockBySize(stockObj);  // ✅ ค่าคงเหลือ(ระบบ) —ล็อกไว้จนกว่าจะบันทึก
       } catch (e) {
         setErr(e instanceof Error ? e.message : 'โหลดข้อมูลสินค้าไม่สำเร็จ');
       } finally {
@@ -78,13 +90,13 @@ export default function EditStockPage() {
     })();
   }, [id]);
 
-  // จำนวนสต๊อกที่เหลืออยู่ (ถ้ายังไม่ได้มี logic “จอง/ขายไป” ให้แสดงเท่ากับ stock)
+  // จำนวนสต๊อกที่เหลืออยู่ (แสดงคงที่จากค่า initial)
   const remainBySize = useMemo<StockBySize>(() => ({
-    S: stockBySize.S,
-    M: stockBySize.M,
-    L: stockBySize.L,
-    XL: stockBySize.XL,
-  }), [stockBySize]);
+    S: initialStockBySize.S,
+    M: initialStockBySize.M,
+    L: initialStockBySize.L,
+    XL: initialStockBySize.XL,
+  }), [initialStockBySize]);
 
   const sizes: SizeKey[] = ['S', 'M', 'L', 'XL'];
 
@@ -95,20 +107,22 @@ export default function EditStockPage() {
       const fd = new FormData();
       fd.append('name', name);
 
-      // 🔁 ราคาแยกไซส์ (ตามที่ API ฝั่งคุณรองรับ)
+      // ราคาแยกไซส์
       fd.append('price_S', String(priceBySize.S ?? 0));
       fd.append('price_M', String(priceBySize.M ?? 0));
       fd.append('price_L', String(priceBySize.L ?? 0));
       fd.append('price_XL', String(priceBySize.XL ?? 0));
 
-      // 🔁 Stock แยกไซส์
+      // Stock แยกไซส์ (ค่าที่แก้ไข)
       fd.append('stock_S', String(stockBySize.S ?? 0));
       fd.append('stock_M', String(stockBySize.M ?? 0));
       fd.append('stock_L', String(stockBySize.L ?? 0));
       fd.append('stock_XL', String(stockBySize.XL ?? 0));
 
-      // หมายเหตุ: ถ้าจะรองรับ category ที่แก้ไขได้ ให้เพิ่มใน API แล้วส่งไปด้วย
-      // fd.append('category', category);
+      // ถ้าต้องการแก้ category ด้วย ให้ปลดคอมเมนต์ด้านล่างและรองรับฝั่ง API
+      // if (category.trim()) {
+      //   fd.append('category', category.trim());
+      // }
 
       const res = await fetch(`/api/products/${id}`, {
         method: 'PUT',
@@ -170,9 +184,13 @@ export default function EditStockPage() {
       <div className={styles.container}>
         {/* หัวเรื่อง */}
         <h1 className={styles.title}>Product Name: {name || '-'}</h1>
-        <p className={styles.categoryText}>Category: {category || 'T-shirt'}</p>
 
-        {/* สองรูปตัวอย่าง */}
+        {/* แสดง Category ถ้ามี */}
+        {category.trim() && (
+          <p className={styles.categoryText}>Category: {category}</p>
+        )}
+
+        {/* รูปตัวอย่าง */}
         <div className={styles.previewRow}>
           <div className={styles.previewBox}>
             <Image src={imgA} alt="preview 1" width={520} height={520} className={styles.previewImg} />
@@ -191,27 +209,17 @@ export default function EditStockPage() {
               <thead>
                 <tr>
                   <th>Size</th>
-                  <th>Product Code</th>
+                  {/* ❌ ลบ Product Code */}
                   <th>Price</th>
                   <th>Stock</th>
                   <th>จำนวนสต๊อกที่เหลืออยู่</th>
-                  <th>แก้ไขสินค้า</th>
+                  {/* ❌ ลบคอลัมน์ “แก้ไขสินค้า” */}
                 </tr>
               </thead>
               <tbody>
                 {sizes.map((sz) => (
                   <tr key={sz}>
                     <td className={styles.cellCenter}>{sz}</td>
-
-                    {/* หมายเหตุ: ถ้าจะเก็บ code จริงใน DB ให้เพิ่ม field / API เอง
-                        ตอนนี้แค่โชว์ input ไว้ก่อน */}
-                    <td>
-                      <input
-                        className={styles.input}
-                        placeholder={`CT-${sz}`}
-                        aria-label={`product-code-${sz}`}
-                      />
-                    </td>
 
                     <td>
                       <input
@@ -237,23 +245,8 @@ export default function EditStockPage() {
                       />
                     </td>
 
+                    {/* ✅ แสดงค่าคงเหลือ(ระบบ) จาก initialStockBySize — ไม่เปลี่ยนตามการพิมพ์ */}
                     <td className={styles.cellCenter}>{remainBySize[sz]}</td>
-
-                    <td className={styles.cellCenter}>
-                      <button
-                        type="button"
-                        className={styles.smallBtn}
-                        onClick={() => {
-                          const q = prompt(`ระบุจำนวน (ไซซ์ ${sz})`, String(stockBySize[sz]));
-                          if (q == null) return;
-                          const n = Number(q);
-                          if (!Number.isFinite(n) || n < 0) return;
-                          setStockBySize((s) => ({ ...s, [sz]: n }));
-                        }}
-                      >
-                        ระบุจำนวน
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>

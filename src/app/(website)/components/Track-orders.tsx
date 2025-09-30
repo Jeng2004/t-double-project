@@ -16,6 +16,8 @@ type OrderItem = {
   size: SizeKey;
   unitPrice: number | null;
   totalPrice: number | null;
+  displaySize?: string;   // ✅ ใช้แสดงไซส์จริง (เช่น 2XL หรือ custom ...)
+  notes?: string;         // ✅ เก็บหมายเหตุจาก sizeDetail
   product?: {
     id: string;
     name: string;
@@ -25,10 +27,13 @@ type OrderItem = {
 
 type AllowedStatus =
   | 'ยกเลิก'
+  | 'รอชำระเงิน'
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
-  | 'จัดส่งสินค้าสำเร็จเเล้ว';
+  | 'จัดส่งสินค้าสำเร็จเเล้ว'
+  | 'ลูกค้าคืนสินค้า'
+  | 'กำลังจัดส่งคืนสินค้า';
 
 type OrderRow = {
   id: string;
@@ -42,40 +47,79 @@ type OrderRow = {
     email?: string | null;
     name?: string | null;
   } | null;
+  source?: 'normal' | 'special';
+  paymentUrl?: string | null;
 };
 
-/* ---------- API response types (avoid any) ---------- */
 type OrderItemApi = {
-  id?: string;
-  productId?: string;
+  id?: string | number;
+  productId?: string | number;
   quantity?: number;
   size?: string;
   unitPrice?: number;
   totalPrice?: number;
   product?: {
-    id?: string;
+    id?: string | number;
     name?: string;
     imageUrls?: string[];
   };
 };
 
 type OrderApi = {
-  id?: string;
-  trackingId?: string;
-  status?: string;
+  id?: string | number;
+  trackingId?: string | null;
+  status?: string | null;
   createdAt?: string;
-  createdAtThai?: string;
+  createdAtThai?: string | null;
   orderItems?: OrderItemApi[];
-  user?: {
-    id?: string;
-    email?: string | null;
-    name?: string | null;
-  };
+  user?: { id?: string; email?: string | null; name?: string | null } | null;
 };
 
 type Props = {
-  /** ถ้าส่งมา จะแสดงเฉพาะคำสั่งซื้อนี้ (ของผู้ใช้คนปัจจุบันเท่านั้น) */
   orderId?: string;
+};
+
+const ALLOWED: AllowedStatus[] = [
+  'ยกเลิก',
+  'รอชำระเงิน',
+  'รอดำเนินการ',
+  'กำลังดำเนินการจัดเตรียมสินค้า',
+  'กำลังดำเนินการจัดส่งสินค้า',
+  'จัดส่งสินค้าสำเร็จเเล้ว',
+  'ลูกค้าคืนสินค้า',
+  'กำลังจัดส่งคืนสินค้า',
+];
+
+const toStatus = (s?: string | null): AllowedStatus => {
+  const v = String(s ?? '').trim();
+  if ((ALLOWED as string[]).includes(v)) return v as AllowedStatus;
+
+  switch (v.toLowerCase()) {
+    case 'pending payment':
+    case 'waiting for payment':
+    case 'unpaid':
+      return 'รอชำระเงิน';
+    case 'pending':
+      return 'รอดำเนินการ';
+    case 'preparing':
+      return 'กำลังดำเนินการจัดเตรียมสินค้า';
+    case 'shipping':
+    case 'in transit':
+      return 'กำลังดำเนินการจัดส่งสินค้า';
+    case 'delivered':
+    case 'completed':
+      return 'จัดส่งสินค้าสำเร็จเเล้ว';
+    case 'returning':
+    case 'return shipping':
+      return 'กำลังจัดส่งคืนสินค้า';
+    case 'customer returned':
+      return 'ลูกค้าคืนสินค้า';
+    case 'cancelled':
+    case 'canceled':
+      return 'ยกเลิก';
+    default:
+      return 'รอดำเนินการ';
+  }
 };
 
 const formatNumber = (n: number) => {
@@ -91,6 +135,8 @@ const firstImage = (arr?: string[]) =>
 
 const statusClass = (status: AllowedStatus): string => {
   switch (status) {
+    case 'รอชำระเงิน':
+      return `${styles.status} ${styles.statusPayWait}`;
     case 'รอดำเนินการ':
       return `${styles.status} ${styles.statusPending}`;
     case 'กำลังดำเนินการจัดเตรียมสินค้า':
@@ -99,12 +145,41 @@ const statusClass = (status: AllowedStatus): string => {
       return `${styles.status} ${styles.statusShipping}`;
     case 'จัดส่งสินค้าสำเร็จเเล้ว':
       return `${styles.status} ${styles.statusSuccess}`;
+    case 'ลูกค้าคืนสินค้า':
+    case 'กำลังจัดส่งคืนสินค้า':
+      return `${styles.status} ${styles.statusReturn}`;
     case 'ยกเลิก':
-      return `${styles.status} ${styles.statusCancel}`;
     default:
-      return `${styles.status} ${styles.statusPending}`;
+      return `${styles.status} ${styles.statusCancel}`;
   }
 };
+
+function parseSizeDetail(input?: string | null): { displaySize?: string; notes?: string } {
+  const raw = String(input ?? '').trim();
+  if (!raw) return {};
+
+  // แยกด้วย "|"
+  const parts = raw.split('|').map((s) => s.trim());
+
+  // preset:xxx หรือ custom:xxx
+  const sizePart = parts.find((p) => /^preset:/i.test(p) || /^custom:/i.test(p));
+  const notesPart = parts.find((p) => /^notes:/i.test(p));
+
+  let displaySize: string | undefined = undefined;
+  if (sizePart) {
+    const [, val] = sizePart.split(':');
+    displaySize = (val ?? '').trim() || undefined; // preset:2XL -> 2XL
+    // ถ้าเป็น custom แล้วไม่มีค่า ก็ปล่อยว่าง
+  }
+
+  let notes: string | undefined = undefined;
+  if (notesPart) {
+    notes = notesPart.replace(/^notes:\s*/i, '').trim() || undefined;
+  }
+
+  return { displaySize, notes };
+}
+
 
 export default function TrackOrders({ orderId }: Props) {
   const [rows, setRows] = useState<OrderRow[]>([]);
@@ -112,69 +187,129 @@ export default function TrackOrders({ orderId }: Props) {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const userId = getUserIdForFrontend();
-    if (!userId) {
+    const uid = getUserIdForFrontend();
+    if (!uid) {
       setErr('ไม่พบผู้ใช้ กรุณาเข้าสู่ระบบ');
       setLoading(false);
       return;
     }
 
+    let currentEmail = '';
+
     const load = async () => {
       setLoading(true);
       setErr(null);
       try {
-        const res = await fetch('/api/orders', { cache: 'no-store' });
-        if (!res.ok) {
-          const t = await res.text();
-          throw new Error(`HTTP ${res.status} ${t}`);
+        const rp = await fetch(`/api/profile?userId=${uid}`, { cache: 'no-store' });
+        if (rp.ok) {
+          const pj = await rp.json();
+          currentEmail = pj?.user?.email || '';
         }
 
-        const data: OrderApi[] = await res.json();
+        const [resNormal, resSpecial] = await Promise.all([
+          fetch('/api/orders', { cache: 'no-store' }),
+          fetch('/api/special-orders', { cache: 'no-store' }),
+        ]);
 
-        const mapped: OrderRow[] = data.map((o) => {
-          const items: OrderItem[] = Array.isArray(o.orderItems)
-            ? o.orderItems.map((it) => ({
-                id: String(it.id ?? ''),
-                productId: String(it.productId ?? ''),
-                quantity: Number(it.quantity ?? 0),
-                size: String(it.size ?? 'M') as SizeKey,
-                unitPrice: typeof it.unitPrice === 'number' ? it.unitPrice : null,
-                totalPrice: typeof it.totalPrice === 'number' ? it.totalPrice : null,
-                product: it.product
+        const dataNormal: unknown = await resNormal.json();
+        const normalArr: OrderApi[] = Array.isArray(dataNormal) ? dataNormal : [dataNormal as OrderApi];
+
+        const normalMapped: OrderRow[] = normalArr.map((o) => ({
+          id: String(o.id ?? ''),
+          trackingId: o.trackingId ?? null,
+          status: toStatus(o.status),
+          createdAt: String(o.createdAt ?? ''),
+          createdAtThai: o.createdAtThai ?? null,
+          orderItems: Array.isArray(o.orderItems)
+            ? o.orderItems.map((it): OrderItem => ({
+                id: String(it?.id ?? ''),
+                productId: String(it?.productId ?? ''),
+                quantity: Number(it?.quantity ?? 0),
+                size: (it?.size as SizeKey) ?? 'M',
+                unitPrice: typeof it?.unitPrice === 'number' ? it.unitPrice : null,
+                totalPrice: typeof it?.totalPrice === 'number' ? it.totalPrice : null,
+                product: it?.product
                   ? {
                       id: String(it.product.id ?? ''),
                       name: String(it.product.name ?? ''),
-                      imageUrls: Array.isArray(it.product.imageUrls)
-                        ? it.product.imageUrls
-                        : [],
+                      imageUrls: Array.isArray(it.product.imageUrls) ? it.product.imageUrls! : [],
                     }
                   : null,
               }))
-            : [];
+            : [],
+          user: o.user
+            ? {
+                id: o.user.id,
+                email: o.user.email ?? undefined,
+                name: o.user.name ?? undefined,
+              }
+            : undefined,
+          source: 'normal',
+        }));
+
+        const rawSpecial: any = await resSpecial.json();
+        let specialArr: any[] = [];
+        if (Array.isArray(rawSpecial)) specialArr = rawSpecial;
+        else if (rawSpecial?.orders && Array.isArray(rawSpecial.orders)) specialArr = rawSpecial.orders;
+        else if (rawSpecial?.order) specialArr = [rawSpecial.order];
+
+        const specialMapped: OrderRow[] = specialArr.map((s) => {
+          const qty = Number(s.quantity ?? 0);
+
+          // ✅ ดึงไซส์จริงจาก sizeDetail (หรือ sizeLabel fallback)
+          const { displaySize, notes } = parseSizeDetail(
+            (s as any).sizeDetail ?? (s as any).sizeLabel ?? ''
+          );
 
           return {
-            id: String(o.id ?? ''),
-            trackingId: o.trackingId ?? null,
-            status: (o.status as AllowedStatus) ?? 'รอดำเนินการ',
-            createdAt: String(o.createdAt ?? ''),
-            createdAtThai: o.createdAtThai ?? null,
-            orderItems: items,
-            user: o.user
-              ? {
-                  id: o.user.id,
-                  email: o.user.email ?? undefined,
-                  name: o.user.name ?? undefined,
-                }
+            id: String(s.id ?? ''),
+            trackingId: s.trackingId ?? null,
+            status: toStatus(s.status),
+            createdAt: String(s.createdAt ?? ''),
+            createdAtThai: s.createdAtThai ?? null,
+            orderItems: [
+              {
+                id: `${s.id ?? ''}-sp-1`,
+                productId: 'special',
+                quantity: qty || 1,
+                size: 'M', // ค่าทางเทคนิค ไม่ถูกนำไปโชว์แล้ว
+                displaySize,            // ✅ ใช้โชว์แทน
+                notes,                  // ✅ เก็บหมายเหตุไว้โชว์บรรทัดถัดไป
+                unitPrice: typeof s.price === 'number' ? s.price : null,
+                totalPrice: typeof s.price === 'number' ? s.price * (qty || 1) : null,
+                product: {
+                  id: 'special',
+                  // ✅ ชื่อสินค้าไม่ปะปนไซส์/โน้ต
+                  name: [s.productName || 'Special Order', s.color ? `(${s.color})` : null]
+                    .filter(Boolean)
+                    .join(' '),
+                  imageUrls: [],
+                },
+              },
+            ],
+            user: s.user
+              ? { id: s.user.id, email: s.user.email ?? undefined, name: s.user.name ?? undefined }
               : undefined,
+            source: 'special',
+            paymentUrl: s.paymentUrl ?? null,
           };
         });
 
-        const mine = mapped.filter((r) => r.user?.id === userId);
-        const filtered = orderId ? mine.filter((r) => r.id === orderId) : mine;
-        setRows(filtered);
+
+        const mineNormal = normalMapped.filter((r) => r.user?.id === uid || r.user?.email === currentEmail);
+        const mineSpecial = specialMapped.filter(
+          (r) => r.user?.id === uid || (!!currentEmail && r.user?.email === currentEmail)
+        );
+
+        const combined = [...mineNormal, ...mineSpecial].sort((a, b) => {
+          const ax = a.createdAtThai ?? a.createdAt;
+          const bx = b.createdAtThai ?? b.createdAt;
+          return (new Date(bx).getTime() || 0) - (new Date(ax).getTime() || 0);
+        });
+
+        setRows(orderId ? combined.filter((r) => r.id === orderId) : combined);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'โหลดคำสั่งซื้อไม่สำเร็จ';
-        setErr(msg);
+        setErr(e instanceof Error ? e.message : 'โหลดคำสั่งซื้อไม่สำเร็จ');
       } finally {
         setLoading(false);
       }
@@ -183,127 +318,74 @@ export default function TrackOrders({ orderId }: Props) {
     load();
   }, [orderId]);
 
-  const flatItems = useMemo(
-    () =>
-      rows.flatMap((order) =>
-        order.orderItems.map((it) => ({
-          orderId: order.id,
-          trackingId: order.trackingId,
-          status: order.status,
-          createdAt: order.createdAtThai ?? order.createdAt,
-          item: it,
-        }))
-      ),
-    [rows]
-  );
-
-  if (loading) {
-    return (
-      <div>
-        <h4 className={styles.title}>ติดตามการสั่งซื้อ</h4>
-        <div>กำลังโหลด…</div>
-      </div>
-    );
-  }
-
-  if (err) {
-    return (
-      <div>
-        <h4 className={styles.title}>ติดตามการสั่งซื้อ</h4>
-        <div style={{ color: '#c00' }}>❌ {err}</div>
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div>
-        <h4 className={styles.title}>ติดตามการสั่งซื้อ</h4>
-        <div>ยังไม่มีคำสั่งซื้อ</div>
-      </div>
-    );
-  }
+  if (loading) return <div>กำลังโหลด…</div>;
+  if (err) return <div style={{ color: '#c00' }}>❌ {err}</div>;
+  if (rows.length === 0) return <div>ยังไม่มีคำสั่งซื้อ</div>;
 
   return (
-    <div>
-
-      <div className={styles.orderList}>
-        {rows.map((order) => (
-          <div key={order.id} className={styles.orderCard}>
-            {/* Header */}
-            <div className={styles.orderHeader}>
-              <div className={styles.headerRow}>
-                <div>
-                  <span className={styles.headerLabel}>รหัสคำสั่งซื้อ:</span>{' '}
-                  <span className={styles.headerValue}>{order.id}</span>
-                </div>
-                <div className={styles.headerRight}>
-                  <span className={styles.headerDate}>
-                    {order.createdAtThai ?? order.createdAt}
-                  </span>
-                  <span className={statusClass(order.status)}>{order.status}</span>
-                </div>
+    <div className={styles.orderList}>
+      {rows.map((order) => (
+        <div key={order.id} className={styles.orderCard}>
+          <div className={styles.orderHeader}>
+            <div className={styles.headerRow}>
+              <div>
+                <span className={styles.headerLabel}>รหัสคำสั่งซื้อ:</span>{' '}
+                <span className={styles.headerValue}>{order.id}</span>
+                {order.source === 'special' && <span className={styles.specialBadge}>SPECIAL</span>}
               </div>
-
-              <div className={styles.headerRow}>
-                <div>
-                  <span className={styles.headerLabel}>Tracking:</span>{' '}
-                  <span className={styles.headerValue}>
-                    {order.trackingId ?? 'ยังไม่มี'}
-                  </span>
-                </div>
-              </div>
-              {/* ✅ เพิ่มลิงก์รายละเอียดเพิ่มเติม ตรงขวาล่าง */}
-              <div className={styles.headerRow}>
-                <div></div>
-                <Link href={`/Order-details-id/${order.id}`} className={styles.productExtraLink}>
-                  รายละเอียดเพิ่มเติม →
-                </Link>
+              <div className={styles.headerRight}>
+                <span className={styles.headerDate}>{order.createdAtThai ?? order.createdAt}</span>
+                <span className={statusClass(order.status)}>{order.status}</span>
               </div>
             </div>
-
-            {/* Items */}
-            <div className={styles.items}>
-              {order.orderItems.map((it) => (
-                <div key={it.id} className={styles.orderItem}>
-                  <Image
-                    className={styles.thumb}
-                    src={firstImage(it.product?.imageUrls)}
-                    alt={it.product?.name || 'product'}
-                    width={60}
-                    height={60}
-                  />
-
-                  <div className={styles.meta}>
-                    <p className={styles.productName}>{it.product?.name ?? '-'}</p>
-
-                    {/* บรรทัด Size เดิม */}
-                    <span className={styles.productDetail}>
-                      Size: {it.size} &nbsp; x{it.quantity}
-                    </span>
-
-
-                  </div>
-
-                  <div className={styles.price}>
-                    ฿
-                    {formatNumber(
-                      (it.totalPrice ??
-                        (typeof it.unitPrice === 'number'
-                          ? it.unitPrice * it.quantity
-                          : 0)) || 0
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className={styles.headerRow}>
+              <div>
+                <span className={styles.headerLabel}>Tracking:</span>{' '}
+                <span className={styles.headerValue}>{order.trackingId ?? 'ยังไม่มี'}</span>
+              </div>
             </div>
-
+            <div className={styles.headerRow}>
+              <div></div>
+              <Link
+                href={order.source === 'special'
+                  ? `/Special-details-id/${order.id}`   // ✅ พิเศษ → หน้าใหม่
+                  : `/Order-details-id/${order.id}`}    // ปกติ → หน้าเดิม
+                className={styles.productExtraLink}
+              >
+                รายละเอียดเพิ่มเติม →
+              </Link>
+            </div>
           </div>
-        ))}
-      </div>
 
-      {/* ตัวอย่างการใช้งาน flatItems ถ้าต้องการ */}
-      {/* {flatItems.length} */}
+          <div className={styles.items}>
+            {order.orderItems.map((it) => (
+              <div key={it.id} className={styles.orderItem}>
+                <Image
+                  className={styles.thumb}
+                  src={firstImage(it.product?.imageUrls)}
+                  alt={it.product?.name || 'product'}
+                  width={60}
+                  height={60}
+                />
+
+                <div className={styles.meta}>
+                  <p className={styles.productName}>{it.product?.name ?? '-'}</p>
+                  <span className={styles.productDetail}>
+                    Size: {(it.displaySize ?? it.size)} &nbsp; x{it.quantity}
+                  </span>
+                </div>
+
+                <div className={styles.price}>
+                  ฿
+                  {formatNumber(
+                    (it.totalPrice ?? (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0)) || 0
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

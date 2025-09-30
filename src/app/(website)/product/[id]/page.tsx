@@ -255,7 +255,6 @@ export default function ProductDetailsPage() {
           {/* รายละเอียด */}
           <div className={styles.detailColumn}>
             <h2 className={styles.title}>{item.name}</h2>
-            <p className={styles.price}>฿{startPrice !== null ? formatTHB(startPrice) : '-'}</p>
 
             {/* ปุ่มไซส์ (ไม่มีตัวเลือกสี) */}
             {/* ปุ่มไซส์ (ไม่มีตัวเลือกสี) */}

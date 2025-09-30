@@ -107,3 +107,20 @@
   font-size: 20px;
   cursor: pointer;
 }
+
+.radioRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  margin-top: 8px;
+}

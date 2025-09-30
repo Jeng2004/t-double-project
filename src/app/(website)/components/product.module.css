@@ -31,9 +31,19 @@
   color: #222;
 }
 
-.price {
+.sizes {
+  display: flex;
+  gap: 8px;
   font-size: 14px;
+}
+
+.size {
   color: #111;
+}
+
+.sizeOut {
+  color: red;
+  text-decoration: line-through;
 }
 
 .outOfStock {

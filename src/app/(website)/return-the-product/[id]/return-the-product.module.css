@@ -1,0 +1,94 @@
+/* Layout */
+.page { background: #f5f5f5; min-height: 100vh; }
+.container { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; background: #fff; }
+
+.title { font-size: 24px; font-weight: 800; margin: 8px 0 16px; color: #222; }
+
+/* Sections */
+.section { margin: 24px 0 16px; }
+.sectionTitle { font-size: 16px; font-weight: 800; margin: 0 0 12px; color: #222; }
+
+/* Info grid (label left / value right) */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  row-gap: 10px;
+  column-gap: 12px;
+}
+.infoLabel { color: #666; font-weight: 600; }
+.infoValue { color: #111; font-weight: 800; text-align: right; }
+.infoValueSuccess { color: #389e0d; font-weight: 800; text-align: right; }
+
+/* Items */
+.itemList { display: flex; flex-direction: column; gap: 12px; }
+.itemRow {
+  display: grid;
+  grid-template-columns: 100px 1fr 180px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fafafa;
+}
+.thumbBox { display: flex; align-items: center; justify-content: center; }
+.thumb { border-radius: 10px; border: 1px solid #eee; background: #fff; }
+.itemMeta { min-width: 0; }
+.itemName { font-weight: 800; margin: 0 0 4px; color: #111; }
+.itemSub { color: #666; font-size: 13px; }
+.itemQtyCell { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.qtyLabel { font-size: 12px; color: #666; }
+.qtyInput {
+  width: 100%;
+  max-width: 120px;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  text-align: right;
+  font-weight: 700;
+}
+
+/* Form */
+.textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 12px;
+  resize: vertical;
+}
+.uploadRow { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.uploadLabel { font-weight: 700; color: #333; }
+.fileInput { border: 1px dashed #ccc; border-radius: 10px; padding: 10px; }
+
+/* Policy */
+.policyBox { margin: 16px 0; padding: 14px; border: 1px solid #eee; border-radius: 12px; background: #fcfcfc; }
+.policyTitle { font-weight: 800; margin-bottom: 6px; }
+.policyList { padding-left: 18px; color: #444; }
+
+/* Actions */
+.actions { display: flex; gap: 12px; margin-top: 16px; }
+.primary, .ghost {
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.primary { background: #000; color: #fff; }
+.primary:disabled { opacity: .7; cursor: not-allowed; }
+.ghost { background: #fff; color: #111; border-color: #ddd; }
+.ghost:hover { background: #f7f7f7; }
+
+.note { margin-top: 10px; font-size: 12px; color: #666; }
+.error { color: #c00; margin: 12px 0; }
+
+/* Responsive */
+@media (max-width: 720px) {
+  .infoGrid { grid-template-columns: 1fr; }
+  .infoValue, .infoValueSuccess { text-align: left; }
+  .itemRow { grid-template-columns: 80px 1fr; }
+  .itemQtyCell { align-items: flex-start; }
+  .qtyInput { max-width: 100%; }
+  .actions { flex-direction: column; }
+}

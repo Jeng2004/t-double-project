@@ -1,13 +1,11 @@
-// C:\Users\yodsa\t-double-project\src\app\(website)\Order-details\page.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import styles from './Order-details.module.css';
+import styles from './payment.module.css';
 import Image from 'next/image';
 import Navbar from '../components/Navbar';
 import { getUserIdForFrontend } from '@/lib/get-user-id';
 
-// ---------- Types ----------
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
 
 type ProductLite = {
@@ -38,15 +36,9 @@ type UserProfile = {
   address?: string | null;
 };
 
-// ---------- Helpers ----------
 const formatNumber = (n: number) => {
-  try {
-    return new Intl.NumberFormat('th-TH').format(n);
-  } catch {
-    return String(n);
-  }
+  try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); }
 };
-
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 
 const splitName = (full?: string | null): { fname: string; lname: string } => {
@@ -56,18 +48,14 @@ const splitName = (full?: string | null): { fname: string; lname: string } => {
   if (parts.length === 1) return { fname: parts[0], lname: '' };
   return { fname: parts.slice(0, -1).join(' '), lname: parts.at(-1) ?? '' };
 };
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null;
-
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const isUserProfile = (u: unknown): u is UserProfile =>
-  isRecord(u) &&
-  typeof u.id === 'string' &&
-  typeof u.email === 'string' &&
-  typeof u.name === 'string';
+  isRecord(u) && typeof u.id === 'string' && typeof u.email === 'string' && typeof u.name === 'string';
 
-export default function OrderDetailsPage() {
-  // ฟอร์มผู้ใช้
+// ---------- NEW: วิธีชำระเงิน ----------
+type PayMethod = 'stripe' | 'manual';
+
+export default function PaymentPage() {
   const [email, setEmail] = useState('');
   const [fname, setFname] = useState('');
   const [lname, setLname] = useState('');
@@ -75,15 +63,12 @@ export default function OrderDetailsPage() {
   const [addressDetail, setAddressDetail] = useState('');
   const [phone, setPhone] = useState('');
 
-  // ตะกร้า
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartLoading, setCartLoading] = useState(true);
   const [cartErr, setCartErr] = useState<string | null>(null);
 
-  // submit order
   const [creating, setCreating] = useState(false);
-
-  // ป้องกัน useEffect dev-mode เรียกซ้ำ
+  const [payMethod, setPayMethod] = useState<PayMethod>('stripe'); // ✅ ค่าเริ่มต้นเป็น Stripe
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -97,14 +82,12 @@ export default function OrderDetailsPage() {
       return;
     }
 
-    // 1) โหลดโปรไฟล์ทั้งหมดจาก /api/users แล้วกรองเองด้วย userId
+    // โหลดโปรไฟล์เพื่อเติมฟอร์ม
     const loadUser = async () => {
       try {
         const res = await fetch(`/api/users`, { cache: 'no-store' });
         if (!res.ok) return;
-
         const dataUnknown = (await res.json()) as unknown;
-
         if (Array.isArray(dataUnknown)) {
           const matched = dataUnknown.find(
             (row): row is UserProfile => isUserProfile(row) && row.id === userId
@@ -116,37 +99,25 @@ export default function OrderDetailsPage() {
             setLname(lname);
             setPhone(matched.phone ?? '');
             setAddress(matched.address ?? '');
-            // addressDetail เว้นไว้กรอกเอง
           }
         }
       } catch (err) {
-        // ไม่ต้องบล็อคหน้า
         console.error('❌ loadUser error:', err);
       }
     };
 
-    // 2) โหลดตะกร้า
+    // โหลดตะกร้า
     const loadCart = async () => {
       setCartLoading(true);
       setCartErr(null);
       try {
-        const res = await fetch(`/api/cart?userId=${encodeURIComponent(userId)}`, {
-          cache: 'no-store',
-        });
-        if (!res.ok) {
-          const t = await res.text();
-          throw new Error(`HTTP ${res.status} ${t}`);
-        }
+        const res = await fetch(`/api/cart?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
         const itemsUnknown = (await res.json()) as unknown;
-        if (Array.isArray(itemsUnknown)) {
-          // ปล่อยผ่าน (backend คืน type ตรงแล้ว)
-          setCart(itemsUnknown as CartItem[]);
-        } else {
-          setCart([]);
-        }
+        if (Array.isArray(itemsUnknown)) setCart(itemsUnknown as CartItem[]);
+        else setCart([]);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'โหลดตะกร้าไม่สำเร็จ';
-        setCartErr(msg);
+        setCartErr(e instanceof Error ? e.message : 'โหลดตะกร้าไม่สำเร็จ');
       } finally {
         setCartLoading(false);
       }
@@ -164,11 +135,13 @@ export default function OrderDetailsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (creating) return;
+
     try {
       setCreating(true);
       const userId = getUserIdForFrontend();
       if (!userId) throw new Error('❌ ไม่พบ userId, กรุณา login ก่อน');
 
+      // 1️⃣ สร้างออเดอร์ก่อน
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,22 +152,34 @@ export default function OrderDetailsPage() {
           phone,
           address: `${address} ${addressDetail}`.trim(),
           email,
-          // ไม่ต้องส่ง items → API จะอ่านจากตะกร้าเอง
         }),
       });
 
-      const data = (await res.json()) as { order?: { trackingId: string }; error?: string };
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'สร้างคำสั่งซื้อไม่สำเร็จ');
 
-      alert(`✅ สร้าง Order สำเร็จ! Tracking ID: ${data.order?.trackingId ?? '-'}`);
-      // window.location.href = '/orders';
+      const orderId = data?.order?.id;
+      if (!orderId) throw new Error('❌ ไม่พบ orderId');
+
+      // 2️⃣ ขอ Stripe Checkout Session โดยส่ง orderId ไป
+      const res2 = await fetch('/api/orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const data2 = await res2.json();
+      if (!res2.ok || !data2?.url) throw new Error(data2.error || '❌ ไม่พบ URL ชำระเงิน');
+
+      // 3️⃣ พา user ไป Stripe Checkout
+      window.location.href = data2.url;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'เกิดข้อผิดพลาด';
-      alert(msg);
+      alert(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
     } finally {
       setCreating(false);
     }
   };
+
 
   return (
     <>
@@ -208,6 +193,7 @@ export default function OrderDetailsPage() {
             className={styles.input}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
 
           <h3>การจัดส่ง</h3>
@@ -218,6 +204,7 @@ export default function OrderDetailsPage() {
               className={styles.input}
               value={fname}
               onChange={(e) => setFname(e.target.value)}
+              required
             />
             <input
               type="text"
@@ -225,6 +212,7 @@ export default function OrderDetailsPage() {
               className={styles.input}
               value={lname}
               onChange={(e) => setLname(e.target.value)}
+              required
             />
           </div>
           <input
@@ -233,6 +221,7 @@ export default function OrderDetailsPage() {
             className={styles.input}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
+            required
           />
           <input
             type="text"
@@ -247,7 +236,31 @@ export default function OrderDetailsPage() {
             className={styles.input}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            required
           />
+
+          {/* ---------- NEW: วิธีชำระเงิน ---------- */}
+          <h3>วิธีชำระเงิน</h3>
+          <label className={styles.radioRow}>
+            <input
+              type="radio"
+              name="pay-method"
+              value="stripe"
+              checked={payMethod === 'stripe'}
+              onChange={() => setPayMethod('stripe')}
+            />
+            <span>บัตร/PromptPay (Stripe Checkout)</span>
+          </label>
+          <label className={styles.radioRow}>
+            <input
+              type="radio"
+              name="pay-method"
+              value="manual"
+              checked={payMethod === 'manual'}
+              onChange={() => setPayMethod('manual')}
+            />
+            <span>ชำระภายหลัง (โอน/เก็บเงินปลายทาง) — สถานะจะเป็น “รอชำระเงิน”</span>
+          </label>
 
           <h3>รายการสั่งซื้อ</h3>
 
@@ -286,7 +299,9 @@ export default function OrderDetailsPage() {
           )}
 
           <button type="submit" className={styles.submitBtn} disabled={creating || cart.length === 0}>
-            {creating ? 'กำลังสร้าง Order…' : 'ชำระเงิน'}
+            {creating
+              ? (payMethod === 'stripe' ? 'กำลังไปหน้าชำระเงิน…' : 'กำลังสร้างคำสั่งซื้อ…')
+              : (payMethod === 'stripe' ? 'ดำเนินการชำระเงิน' : 'สั่งซื้อ (ชำระภายหลัง)')}
           </button>
         </form>
       </div>

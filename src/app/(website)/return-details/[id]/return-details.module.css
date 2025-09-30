@@ -1,0 +1,85 @@
+/* Layout */
+.page { background: #f5f5f5; min-height: 100vh; }
+.container { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; background: #fff; }
+
+.title { font-size: 24px; font-weight: 800; margin: 8px 0 12px; color: #222; }
+
+.section { margin: 24px 0 16px; }
+.sectionTitle { font-size: 16px; font-weight: 800; margin: 0 0 12px; color: #222; }
+
+/* Label / Value 2 คอลัมน์ */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  row-gap: 12px;
+  column-gap: 12px;
+  margin-bottom: 8px;
+}
+.infoLabel { color: #666; font-weight: 600; text-align: left; }
+.infoValue { color: #111; font-weight: 700; text-align: right; }
+
+/* Badge (ตามแนวเดียวกับ admin) */
+.badge { padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; line-height: 1; border: 1px solid transparent; }
+.badgePending { background: #f5f5f5; color: #595959; border-color: #d9d9d9; }
+.badgeSuccess { background: #f6ffed; color: #389e0d; border-color: #b7eb8f; }
+.badgeCancel  { background: #fff1f0; color: #cf1322; border-color: #ffa39e; }
+
+/* รายการสินค้า (โทนเดียวกับ Order-details-admin) */
+.itemRow {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fafafa;
+  margin-bottom: 12px;
+}
+.thumbBox { display: flex; align-items: center; justify-content: center; }
+.thumb { border-radius: 10px; border: 1px solid #eee; background: #fff; }
+.itemMeta { min-width: 0; }
+.itemName { font-weight: 800; margin: 0 0 6px; color: #111; }
+.itemSub { color: #666; font-size: 13px; margin-bottom: 6px; }
+
+.summaryRow { margin-top: 8px; text-align: right; color: #111; }
+
+/* การ์ดผู้รับ */
+.recipientCard { border: 1px solid #ddd; border-radius: 10px; padding: 16px; background: #fff; }
+.recRow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 10px; }
+.recRow:last-child { margin-bottom: 0; }
+.recCol { min-width: 0; }
+.recLabel { color: #666; font-weight: 600; margin-bottom: 4px; }
+.recValue { color: #111; font-weight: 700; }
+
+/* เหตุผล */
+.reasonBox { border: 1px solid #eee; border-radius: 10px; padding: 12px; background: #fafafa; color: #333; }
+
+/* หลักฐาน */
+.proofGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.proofItem { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 6px; display: flex; align-items: center; justify-content: center; }
+.proofImg { width: 100%; height: auto; border-radius: 8px; object-fit: cover; }
+
+/* ปุ่ม */
+.actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.btnPrimary, .btnDanger, .btnGhost, .btnGhostDanger {
+  padding: 10px 18px; border-radius: 8px; font-weight: 800; cursor: pointer; border: 1px solid transparent;
+}
+.btnPrimary { background: #111; color: #fff; }
+.btnDanger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.btnGhost { background: #fff; color: #111; border: 1px solid #ddd; }
+.btnGhostDanger { background: #fff; color: #b91c1c; border: 1px solid #fecaca; }
+
+.error { color: #c00; margin: 12px 0; }
+
+/* Responsive */
+@media (max-width: 720px) {
+  .infoGrid { grid-template-columns: 1fr; }
+  .infoLabel { text-align: left; }
+  .infoValue { text-align: left; }
+  .recRow { grid-template-columns: 1fr; }
+}
