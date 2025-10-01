@@ -1,3 +1,4 @@
+// src/app/(website)/Specail-admin/page.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +28,21 @@ type SpecialOrder = {
   user?: { name?: string | null; email?: string | null } | null;
 };
 
+/** รูปร่างข้อมูลที่ API อาจส่งมา (สำหรับ parse แบบมี type) */
+type SpecialOrderApi = {
+  id?: string | number;
+  productName?: string | null;
+  sizeDetail?: string | null;
+  quantity?: number | string | null;
+  price?: number | null;
+  totalAmount?: number | null;
+  status?: string | null;
+  createdAt?: string | null;
+  createdAtThai?: string | null;
+  trackingId?: string | null;
+  user?: { name?: string | null; email?: string | null } | null;
+};
+
 const STATUS_LIST: AllowedStatus[] = [
   'ยกเลิก',
   'รอชำระเงิน',
@@ -41,6 +57,19 @@ const fmtTH = (iso: string, thai?: string | null) =>
   thai && thai.trim()
     ? thai
     : new Date(iso).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null;
+
+const toStr = (v: unknown) => (v == null ? '' : String(v));
+const toNum = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const toStatus = (s: unknown): AllowedStatus => {
+  const v = String(s ?? '').trim();
+  return (STATUS_LIST as string[]).includes(v) ? (v as AllowedStatus) : 'รอดำเนินการ';
+};
 
 export default function SpecailAdminPage() {
   const router = useRouter();
@@ -65,44 +94,40 @@ export default function SpecailAdminPage() {
         const text = await res.text();
         if (!res.ok) throw new Error(`HTTP ${res.status} ${text}`);
 
-        let json: any = {};
-        try { json = JSON.parse(text); } catch { json = text; }
+        // พยายาม parse JSON; ถ้าไม่ใช่ JSON จะโยน text กลับ
+        let jsonUnknown: unknown;
+        try {
+          jsonUnknown = JSON.parse(text);
+        } catch {
+          jsonUnknown = text; // ไม่ใช่ JSON
+        }
 
         // รองรับหลายรูปแบบผลลัพธ์: [ ... ] | { orders:[...] } | { order:{...} }
-        let list: any[] = [];
-        if (Array.isArray(json)) list = json;
-        else if (Array.isArray(json?.orders)) list = json.orders;
-        else if (json?.order) list = [json.order];
-        else list = [];
+        let listUnknown: unknown[] = [];
+        if (Array.isArray(jsonUnknown)) {
+          listUnknown = jsonUnknown;
+        } else if (isRecord(jsonUnknown) && Array.isArray(jsonUnknown.orders)) {
+          listUnknown = jsonUnknown.orders as unknown[];
+        } else if (isRecord(jsonUnknown) && jsonUnknown.order) {
+          listUnknown = [jsonUnknown.order as unknown];
+        }
 
-        const STATUS_LIST: AllowedStatus[] = [
-          'ยกเลิก',
-          'รอชำระเงิน',
-          'รอดำเนินการ',
-          'กำลังดำเนินการจัดเตรียมสินค้า',
-          'กำลังดำเนินการจัดส่งสินค้า',
-          'จัดส่งสินค้าสำเร็จเเล้ว',
-        ];
-        const toStatus = (s: any): AllowedStatus =>
-          STATUS_LIST.includes(s as AllowedStatus) ? (s as AllowedStatus) : 'รอดำเนินการ';
-        const toNum = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-        const toStr = (v: any) => (v == null ? '' : String(v));
-
-        const mapped: SpecialOrder[] = list.map((o: any) => ({
-          id: toStr(o.id),
-          productName: toStr(o.productName || 'Special Order'),
-          sizeDetail: toStr(o.sizeDetail || ''),
-          quantity: toNum(o.quantity || 0),
-          price: typeof o.price === 'number' ? o.price : null,
-          totalAmount: typeof o.totalAmount === 'number' ? o.totalAmount : null,
-          status: toStatus(o.status),
-          createdAt: toStr(o.createdAt || new Date().toISOString()),
-          createdAtThai: o.createdAtThai ?? null,
-          trackingId: o.trackingId ?? null,
-          user: o.user
-            ? { name: o.user.name ?? null, email: o.user.email ?? null }
-            : null,
-        }));
+        const mapped: SpecialOrder[] = listUnknown.map((rowUnknown) => {
+          const o = rowUnknown as SpecialOrderApi; // cast จาก unknown → รูปร่าง API
+          return {
+            id: toStr(o.id),
+            productName: toStr(o.productName ?? 'Special Order'),
+            sizeDetail: toStr(o.sizeDetail ?? ''),
+            quantity: toNum(o.quantity ?? 0),
+            price: typeof o.price === 'number' ? o.price : null,
+            totalAmount: typeof o.totalAmount === 'number' ? o.totalAmount : null,
+            status: toStatus(o.status),
+            createdAt: toStr(o.createdAt ?? new Date().toISOString()),
+            createdAtThai: o.createdAtThai ?? null,
+            trackingId: o.trackingId ?? null,
+            user: o.user ? { name: o.user.name ?? null, email: o.user.email ?? null } : null,
+          };
+        });
 
         setRows(mapped);
       } catch (e) {
@@ -113,7 +138,6 @@ export default function SpecailAdminPage() {
       }
     })();
   }, []);
-
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -145,7 +169,7 @@ export default function SpecailAdminPage() {
     }
   };
 
-  const openPopover = (order: SpecialOrder, e: React.MouseEvent) => {
+  const openPopover = (order: SpecialOrder, e: React.MouseEvent<HTMLButtonElement>) => {
     setOpenForId(order.id);
     setDraftStatus(order.status);
     setPopPos({ x: e.clientX, y: e.clientY });
@@ -236,7 +260,7 @@ export default function SpecailAdminPage() {
                       <td>{r.productName}</td>
                       <td>{r.sizeDetail}</td>
                       <td>{r.quantity}</td>
-                      <td>{r.price ? `฿${nf(r.price)}` : '—'}</td>
+                      <td>{typeof r.price === 'number' ? `฿${nf(r.price)}` : '—'}</td>
                       <td>
                         <button
                           className={pillClass(r.status)}

@@ -78,8 +78,53 @@
 
 /* Responsive */
 @media (max-width: 720px) {
+  .container { max-width: 1200px; }
   .infoGrid { grid-template-columns: 1fr; }
   .infoLabel { text-align: left; }
   .infoValue { text-align: left; }
   .recRow { grid-template-columns: 1fr; }
+}
+
+.proofBtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 8px; /* ให้ตรงกับ .proofImg */
+}
+
+/* โฟกัสคีย์บอร์ดให้มองเห็นชัด */
+.proofBtn:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
+/* เอฟเฟกต์เวลา hover ให้ภาพเด้งเล็กน้อย */
+.proofItem {
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.proofItem:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+}
+
+/* ภาพหลักฐานให้คงสัดส่วนสวย ๆ */
+.proofImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  object-fit: cover;
+  /* ป้องกันภาพแตกในจอใหญ่ ๆ */
+  max-height: 220px;
+}
+
+/* ปรับ grid ให้ยืดหยุ่นขึ้นนิด */
+.proofGrid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
 }

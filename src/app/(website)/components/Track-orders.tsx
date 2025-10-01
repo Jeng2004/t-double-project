@@ -75,6 +75,23 @@ type OrderApi = {
   user?: { id?: string; email?: string | null; name?: string | null } | null;
 };
 
+/** ✅ ชนิดข้อมูลสำหรับคำสั่งซื้อพิเศษ (แทนการใช้ any) */
+type SpecialOrderApi = {
+  id?: string | number;
+  trackingId?: string | null;
+  status?: string | null;
+  createdAt?: string | null;
+  createdAtThai?: string | null;
+  quantity?: number | string | null;
+  price?: number | null;
+  productName?: string | null;
+  color?: string | null;
+  sizeDetail?: string | null;
+  sizeLabel?: string | null;
+  user?: { id?: string; email?: string | null; name?: string | null } | null;
+  paymentUrl?: string | null;
+};
+
 type Props = {
   orderId?: string;
 };
@@ -154,6 +171,10 @@ const statusClass = (status: AllowedStatus): string => {
   }
 };
 
+/** small helper for narrowing */
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null;
+
 function parseSizeDetail(input?: string | null): { displaySize?: string; notes?: string } {
   const raw = String(input ?? '').trim();
   if (!raw) return {};
@@ -169,7 +190,6 @@ function parseSizeDetail(input?: string | null): { displaySize?: string; notes?:
   if (sizePart) {
     const [, val] = sizePart.split(':');
     displaySize = (val ?? '').trim() || undefined; // preset:2XL -> 2XL
-    // ถ้าเป็น custom แล้วไม่มีค่า ก็ปล่อยว่าง
   }
 
   let notes: string | undefined = undefined;
@@ -179,7 +199,6 @@ function parseSizeDetail(input?: string | null): { displaySize?: string; notes?:
 
   return { displaySize, notes };
 }
-
 
 export default function TrackOrders({ orderId }: Props) {
   const [rows, setRows] = useState<OrderRow[]>([]);
@@ -211,8 +230,11 @@ export default function TrackOrders({ orderId }: Props) {
           fetch('/api/special-orders', { cache: 'no-store' }),
         ]);
 
+        // ---------- ปกติ ----------
         const dataNormal: unknown = await resNormal.json();
-        const normalArr: OrderApi[] = Array.isArray(dataNormal) ? dataNormal : [dataNormal as OrderApi];
+        const normalArr: OrderApi[] = Array.isArray(dataNormal)
+          ? (dataNormal as OrderApi[])
+          : [dataNormal as OrderApi];
 
         const normalMapped: OrderRow[] = normalArr.map((o) => ({
           id: String(o.id ?? ''),
@@ -247,19 +269,22 @@ export default function TrackOrders({ orderId }: Props) {
           source: 'normal',
         }));
 
-        const rawSpecial: any = await resSpecial.json();
-        let specialArr: any[] = [];
-        if (Array.isArray(rawSpecial)) specialArr = rawSpecial;
-        else if (rawSpecial?.orders && Array.isArray(rawSpecial.orders)) specialArr = rawSpecial.orders;
-        else if (rawSpecial?.order) specialArr = [rawSpecial.order];
+        // ---------- พิเศษ (Typed) ----------
+        const dataSpecialUnknown: unknown = await resSpecial.json();
 
-        const specialMapped: OrderRow[] = specialArr.map((s) => {
+        let specialArr: SpecialOrderApi[] = [];
+        if (Array.isArray(dataSpecialUnknown)) {
+          specialArr = dataSpecialUnknown as SpecialOrderApi[];
+        } else if (isRecord(dataSpecialUnknown) && Array.isArray(dataSpecialUnknown.orders)) {
+          specialArr = dataSpecialUnknown.orders as SpecialOrderApi[];
+        } else if (isRecord(dataSpecialUnknown) && dataSpecialUnknown.order) {
+          specialArr = [dataSpecialUnknown.order as SpecialOrderApi];
+        }
+
+        const specialMapped: OrderRow[] = specialArr.map((s: SpecialOrderApi) => {
           const qty = Number(s.quantity ?? 0);
-
           // ✅ ดึงไซส์จริงจาก sizeDetail (หรือ sizeLabel fallback)
-          const { displaySize, notes } = parseSizeDetail(
-            (s as any).sizeDetail ?? (s as any).sizeLabel ?? ''
-          );
+          const { displaySize, notes } = parseSizeDetail(s.sizeDetail ?? s.sizeLabel ?? '');
 
           return {
             id: String(s.id ?? ''),
@@ -274,7 +299,7 @@ export default function TrackOrders({ orderId }: Props) {
                 quantity: qty || 1,
                 size: 'M', // ค่าทางเทคนิค ไม่ถูกนำไปโชว์แล้ว
                 displaySize,            // ✅ ใช้โชว์แทน
-                notes,                  // ✅ เก็บหมายเหตุไว้โชว์บรรทัดถัดไป
+                notes,                  // ✅ เก็บหมายเหตุไว้โชว์บรรทัดถัดไป (ถ้าต้องใช้)
                 unitPrice: typeof s.price === 'number' ? s.price : null,
                 totalPrice: typeof s.price === 'number' ? s.price * (qty || 1) : null,
                 product: {
@@ -295,7 +320,7 @@ export default function TrackOrders({ orderId }: Props) {
           };
         });
 
-
+        // ---------- รวม + กรองเฉพาะของฉัน ----------
         const mineNormal = normalMapped.filter((r) => r.user?.id === uid || r.user?.email === currentEmail);
         const mineSpecial = specialMapped.filter(
           (r) => r.user?.id === uid || (!!currentEmail && r.user?.email === currentEmail)
@@ -347,9 +372,11 @@ export default function TrackOrders({ orderId }: Props) {
             <div className={styles.headerRow}>
               <div></div>
               <Link
-                href={order.source === 'special'
-                  ? `/Special-details-id/${order.id}`   // ✅ พิเศษ → หน้าใหม่
-                  : `/Order-details-id/${order.id}`}    // ปกติ → หน้าเดิม
+                href={
+                  order.source === 'special'
+                    ? `/Special-details-id/${order.id}`   // ✅ พิเศษ → หน้าใหม่
+                    : `/Order-details-id/${order.id}`     // ปกติ → หน้าเดิม
+                }
                 className={styles.productExtraLink}
               >
                 รายละเอียดเพิ่มเติม →
@@ -371,14 +398,15 @@ export default function TrackOrders({ orderId }: Props) {
                 <div className={styles.meta}>
                   <p className={styles.productName}>{it.product?.name ?? '-'}</p>
                   <span className={styles.productDetail}>
-                    Size: {(it.displaySize ?? it.size)} &nbsp; x{it.quantity}
+                    Size: {it.displaySize ?? it.size} &nbsp; x{it.quantity}
                   </span>
                 </div>
 
                 <div className={styles.price}>
                   ฿
                   {formatNumber(
-                    (it.totalPrice ?? (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0)) || 0
+                    (it.totalPrice ??
+                      (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0)) || 0
                   )}
                 </div>
               </div>

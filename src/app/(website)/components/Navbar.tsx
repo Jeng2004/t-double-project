@@ -52,9 +52,9 @@ export default function Navbar() {
 
         <div className="hidden md:flex space-x-6 text-sm">
           <button onClick={() => router.push('/')} className="hover:underline focus:outline-none">HOME</button>
-          <button onClick={() => router.push('/tee')} className="hover:underline focus:outline-none">TEE</button>
-          <button onClick={() => router.push('/sweats')} className="hover:underline focus:outline-none">SWEATS</button>
-          <button onClick={() => router.push('/Special')} className="hover:underline focus:outline-none">Special</button>
+          <button onClick={() => router.push('/Special')} className="hover:underline focus:outline-none"></button>
+          <button onClick={() => router.push('/T-shirt')} className="hover:underline focus:outline-none">T-shirt</button>
+          <button onClick={() => router.push('/sweater')} className="hover:underline focus:outline-none">sweater</button>
         </div>
       </div>
 

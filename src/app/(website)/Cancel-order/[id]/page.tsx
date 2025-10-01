@@ -1,3 +1,4 @@
+// src/app/(website)/Cancel-order/[id]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -8,8 +9,10 @@ import styles from './Cancel-order.module.css';
 import { getUserIdForFrontend } from '@/lib/get-user-id';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
+
 type AllowedStatus =
   | 'ยกเลิก'
+  | 'รอชำระเงิน'
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
@@ -57,7 +60,6 @@ export default function CancelOrderPage() {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // เหตุผลตัวอย่างตาม UI
   const reasons = [
     'สั่งซื้อผิดรุ่น/ผิดสี',
     'เปลี่ยนใจ',
@@ -78,7 +80,6 @@ export default function CancelOrderPage() {
         const raw: unknown = await res.json();
         if (!Array.isArray(raw)) throw new Error('ข้อมูลคำสั่งซื้อไม่ถูกต้อง');
 
-        // map แบบ type-safe โดยไม่ใช้ any
         const mapped: OrderRow[] = raw.map((o): OrderRow => {
           const obj = o as Record<string, unknown>;
           const orderItemsRaw = Array.isArray(obj.orderItems) ? (obj.orderItems as unknown[]) : [];
@@ -107,16 +108,27 @@ export default function CancelOrderPage() {
 
           const uRaw = (obj.user as Record<string, unknown> | undefined) ?? undefined;
 
+          // 🔁 map สถานะจาก BE → AllowedStatus (รวม "รอชำระเงิน")
           const status = (() => {
-            const s = String(obj.status ?? '');
+            const s = String(obj.status ?? '').trim();
             const allowed: AllowedStatus[] = [
               'ยกเลิก',
+              'รอชำระเงิน',
               'รอดำเนินการ',
               'กำลังดำเนินการจัดเตรียมสินค้า',
               'กำลังดำเนินการจัดส่งสินค้า',
               'จัดส่งสินค้าสำเร็จเเล้ว',
             ];
-            return (allowed as string[]).includes(s) ? (s as AllowedStatus) : 'รอดำเนินการ';
+            if ((allowed as string[]).includes(s)) return s as AllowedStatus;
+
+            const low = s.toLowerCase();
+            if (['pending payment', 'waiting for payment', 'unpaid'].includes(low)) return 'รอชำระเงิน';
+            if (['pending'].includes(low)) return 'รอดำเนินการ';
+            if (['preparing'].includes(low)) return 'กำลังดำเนินการจัดเตรียมสินค้า';
+            if (['shipping', 'in transit'].includes(low)) return 'กำลังดำเนินการจัดส่งสินค้า';
+            if (['delivered', 'completed'].includes(low)) return 'จัดส่งสินค้าสำเร็จเเล้ว';
+            if (['cancelled', 'canceled'].includes(low)) return 'ยกเลิก';
+            return 'รอดำเนินการ';
           })();
 
           return {
@@ -153,7 +165,6 @@ export default function CancelOrderPage() {
     };
   }, [id, userId]);
 
-  // ✅ Hooks ทั้งหมดต้องอยู่ก่อน early return เสมอ
   const orderTotal = useMemo(() => {
     if (!order) return 0;
     return order.orderItems.reduce((sum, it) => {
@@ -162,45 +173,59 @@ export default function CancelOrderPage() {
     }, 0);
   }, [order]);
 
-  // ✅ คำนวณคลาส badge ที่นี่ (ก่อน early return) และเผื่อกรณียังไม่มี order
   const badgeClass = useMemo(() => {
-    const status: AllowedStatus = order?.status ?? 'รอดำเนินการ';
+    const st: AllowedStatus = order?.status ?? 'รอดำเนินการ';
     const map: Record<AllowedStatus, string> = {
+      'รอชำระเงิน': `${styles.badge} ${styles.badgePayWait}`,
       'รอดำเนินการ': `${styles.badge} ${styles.badgePending}`,
       'กำลังดำเนินการจัดเตรียมสินค้า': `${styles.badge} ${styles.badgePreparing}`,
       'กำลังดำเนินการจัดส่งสินค้า': `${styles.badge} ${styles.badgeShipping}`,
       'จัดส่งสินค้าสำเร็จเเล้ว': `${styles.badge} ${styles.badgeSuccess}`,
       'ยกเลิก': `${styles.badge} ${styles.badgeCancel}`,
     };
-    return map[status];
+    return map[st];
   }, [order?.status]);
 
-  const submitCancel = async () => {
+  async function submitCancel() {
     if (!order) return;
     if (!reason) return alert('กรุณาเลือกเหตุผลในการยกเลิก');
     if (!confirm('ยืนยันการยกเลิกคำสั่งซื้อนี้หรือไม่?')) return;
 
     try {
       setSubmitting(true);
-      const res = await fetch(`/api/cancel-orders`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: order.id, cancelReason: reason }),
-      });
-      if (!res.ok) {
+
+      if (order.status === 'รอชำระเงิน') {
+        // ✅ ยกเลิกออเดอร์ที่ยังไม่ชำระเงิน → เปลี่ยนสถานะเป็น "ยกเลิก"
+        const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ยกเลิก', cancelReason: reason }),
+        });
         const t = await res.text();
-        throw new Error(`ยกเลิกไม่สำเร็จ: ${res.status} ${t}`);
+        if (!res.ok) throw new Error(t || 'ยกเลิกไม่สำเร็จ');
+        alert('ยกเลิกคำสั่งซื้อเรียบร้อย');
+      } else if (order.status === 'รอดำเนินการ') {
+        // ✅ เคสชำระแล้ว (รอดำเนินการ) → ใช้เอนด์พอยต์ยกเลิกพร้อมคืนเงิน
+        const res = await fetch('/api/cancel-orders', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: order.id, cancelReason: reason }),
+        });
+        const t = await res.text();
+        if (!res.ok) throw new Error(t || 'ยกเลิกและคืนเงินไม่สำเร็จ');
+        alert('ยกเลิกและคืนเงินเรียบร้อย');
+      } else {
+        alert('สถานะนี้ไม่สามารถยกเลิกได้');
+        return;
       }
-      alert('ยกเลิกคำสั่งซื้อสำเร็จ');
+
       router.replace(`/Order-details-id/${order.id}`);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // ====== Early returns ด้านล่างนี้ ปลอดภัยแล้ว เพราะ hooks อยู่ข้างบนครบ ======
+  }
 
   if (loading) {
     return (
@@ -228,6 +253,9 @@ export default function CancelOrderPage() {
 
   const createdAtDisplay = order.createdAtThai ?? order.createdAt;
   const firstItem = order.orderItems[0];
+
+  // เปิดให้กดเฉพาะสองสถานะนี้
+  const canCancel = order.status === 'รอชำระเงิน' || order.status === 'รอดำเนินการ';
 
   return (
     <>
@@ -290,22 +318,34 @@ export default function CancelOrderPage() {
                   className={styles.select}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
+                  disabled={!canCancel}
                 >
                   <option value="" disabled>โปรดเลือกเหตุผล</option>
-                  {['สั่งซื้อผิดรุ่น/ผิดสี','เปลี่ยนใจ','ใส่ที่อยู่/เบอร์ผิด','ต้องการแก้ไขคำสั่งซื้อ','อื่น ๆ']
-                    .map((r) => <option key={r} value={r}>{r}</option>)}
+                  {reasons.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
                 </select>
                 <span className={styles.caret}>▾</span>
               </div>
             </div>
+            {!canCancel && (
+              <div className={styles.note}>
+                ออเดอร์สถานะ <b>{order.status}</b> ไม่สามารถยกเลิกได้จากหน้านี้
+              </div>
+            )}
           </section>
 
-          <button className={styles.submitBtn} onClick={submitCancel} disabled={submitting || !reason}>
+          <button
+            className={styles.submitBtn}
+            onClick={submitCancel}
+            disabled={submitting || !reason || !canCancel}
+            title={canCancel ? 'ยืนยันการยกเลิก' : 'สถานะนี้ยกเลิกไม่ได้'}
+          >
             {submitting ? 'กำลังดำเนินการ…' : 'ยืนยันการยกเลิกคำสั่งซื้อ'}
           </button>
 
           <p className={styles.note}>
-            การยกเลิกคำสั่งซื้อเป็นไปตามเงื่อนไข หากอนุมัติการยกเลิก ระบบจะดำเนินการคืนเงินภายใน 3–7 วันทำการ (ตามเงื่อนไขการชำระ)
+            * ถ้าเป็นออเดอร์ที่ชำระแล้ว ระบบจะดำเนินการคืนเงินตามช่องทางเดิมภายใน 3–7 วันทำการ (ขึ้นกับผู้ให้บริการชำระเงิน)
           </p>
         </div>
       </div>

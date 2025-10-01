@@ -38,6 +38,9 @@ type SpecialOrder = {
   paymentUrl?: string | null;
 };
 
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null;
+
 const nf = (n: number) => {
   try { return new Intl.NumberFormat('th-TH').format(n || 0); }
   catch { return String(n); }
@@ -97,18 +100,27 @@ export default function SpecialAdminDetailPage() {
       try {
         setLoading(true);
         setErr(null);
-        // BE /[id] ส่ง object เดี่ยว
+
         const res = await fetch(`/api/special-orders/${id}`, { cache: 'no-store' });
-        const data: SpecialOrder = await res.json();
-        if (!res.ok) throw new Error((data as any)?.error || 'โหลดข้อมูลไม่สำเร็จ');
+        const raw: unknown = await res.json();
+
+        if (!res.ok) {
+          const msg =
+            isRecord(raw) && typeof raw.error === 'string'
+              ? raw.error
+              : 'โหลดข้อมูลไม่สำเร็จ';
+          throw new Error(msg);
+        }
+
+        const data = raw as SpecialOrder;
 
         if (!ignore) {
           setOrder(data);
           setUnitPrice(typeof data.price === 'number' ? String(data.price) : '');
           setStatus(normalizeStatus(data.status));
-          setPaymentLink((data as any)?.paymentUrl ?? null);
+          setPaymentLink(typeof data.paymentUrl === 'string' ? data.paymentUrl : null);
         }
-      } catch (e) {
+      } catch (e: unknown) {
         if (!ignore) setErr(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
       } finally {
         if (!ignore) setLoading(false);
@@ -137,14 +149,28 @@ export default function SpecialAdminDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: order.id, price: p }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'สร้างลิงก์ชำระเงินไม่สำเร็จ');
+      const raw: unknown = await res.json();
+      if (!res.ok) {
+        const msg =
+          isRecord(raw) && typeof raw.error === 'string'
+            ? raw.error
+            : 'สร้างลิงก์ชำระเงินไม่สำเร็จ';
+        throw new Error(msg);
+      }
 
-      const url = data?.order?.paymentUrl || data?.paymentUrl || data?.session?.url || null;
+      // ดึง paymentUrl จากหลายรูปแบบผลลัพธ์
+      let url: string | null = null;
+      if (isRecord(raw) && typeof raw.paymentUrl === 'string') {
+        url = raw.paymentUrl;
+      } else if (isRecord(raw) && isRecord(raw.order) && typeof raw.order.paymentUrl === 'string') {
+        url = raw.order.paymentUrl;
+      } else if (isRecord(raw) && isRecord(raw.session) && typeof raw.session.url === 'string') {
+        url = raw.session.url;
+      }
       setPaymentLink(url);
       alert('✅ บันทึกราคาและออกลิงก์ชำระเงินเรียบร้อย');
-    } catch (e: any) {
-      alert(e?.message || 'ไม่สามารถสร้างลิงก์ชำระเงินได้');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'ไม่สามารถสร้างลิงก์ชำระเงินได้');
     } finally {
       setCreatingPayLink(false);
     }
@@ -160,11 +186,17 @@ export default function SpecialAdminDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'อัปเดตสถานะไม่สำเร็จ');
+      const raw: unknown = await res.json();
+      if (!res.ok) {
+        const msg =
+          isRecord(raw) && typeof raw.error === 'string'
+            ? raw.error
+            : 'อัปเดตสถานะไม่สำเร็จ';
+        throw new Error(msg);
+      }
       alert('✅ อัปเดตสถานะเรียบร้อย');
-    } catch (e: any) {
-      alert(e?.message || 'อัปเดตสถานะไม่สำเร็จ');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'อัปเดตสถานะไม่สำเร็จ');
     } finally {
       setUpdatingStatus(false);
     }

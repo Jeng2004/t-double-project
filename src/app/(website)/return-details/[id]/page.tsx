@@ -6,7 +6,6 @@ import Image from 'next/image';
 import styles from './return-details.module.css';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
-
 type ReturnStatus = 'รอดำเนินการ' | 'approved' | 'rejected';
 
 type ReturnItem = {
@@ -26,7 +25,7 @@ type ReturnItem = {
 
 type ReturnRequestRow = {
   id: string;
-  status: ReturnStatus | string; // api อาจส่งเป็น string
+  status: ReturnStatus | string;
   reason?: string | null;
   images?: string[];
   createdAt?: string;
@@ -45,6 +44,7 @@ type ReturnRequestRow = {
   } | null;
 };
 
+/* ---------- Helpers for formatting ---------- */
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 const nf = (n: number) => { try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); } };
 const fmtTH = (d?: string) => {
@@ -55,7 +55,6 @@ const fmtTH = (d?: string) => {
     return d;
   }
 };
-
 const badgeClass = (s: string) => {
   switch (s) {
     case 'รอดำเนินการ': return `${styles.badge} ${styles.badgePending}`;
@@ -64,6 +63,51 @@ const badgeClass = (s: string) => {
     default:             return `${styles.badge} ${styles.badgePending}`;
   }
 };
+
+/* ---------- Raw API types + safe casters ---------- */
+type ApiReturnItemRaw = {
+  id?: unknown;
+  quantity?: unknown;
+  orderItem?: {
+    id?: unknown;
+    size?: unknown;
+    product?: {
+      id?: unknown;
+      name?: unknown;
+      imageUrls?: unknown;
+      code?: unknown;
+    } | null;
+  } | null;
+};
+
+type ApiReturnRequestRaw = {
+  id?: unknown;
+  status?: unknown;
+  reason?: unknown;
+  images?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  orderId?: unknown;
+  items?: unknown;
+  order?: {
+    id?: unknown;
+    trackingId?: unknown;
+    user?: {
+      name?: unknown;
+      email?: unknown;
+      phone?: unknown;
+      address?: unknown;
+    } | null;
+  } | null;
+};
+
+const toStr = (v: unknown): string => (typeof v === 'string' ? v : String(v ?? ''));
+const toNum = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const toStrArr = (v: unknown): string[] =>
+  Array.isArray(v) ? (v.filter((x): x is string => typeof x === 'string')) : [];
 
 export default function ReturnProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,45 +124,55 @@ export default function ReturnProductDetailPage() {
       try {
         setLoading(true);
         setErr(null);
+
         const res = await fetch(`/api/orders/return/${id}`, { cache: 'no-store' });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'โหลดคำขอคืนสินค้าไม่สำเร็จ');
+        const dataUnknown: unknown = await res.json();
+        if (!res.ok) {
+          const msg = (dataUnknown as { error?: string } | null)?.error ?? 'โหลดคำขอคืนสินค้าไม่สำเร็จ';
+          throw new Error(msg);
+        }
+        const data = dataUnknown as ApiReturnRequestRaw;
+
+        const itemsRaw: ApiReturnItemRaw[] = Array.isArray(data.items) ? (data.items as ApiReturnItemRaw[]) : [];
 
         const mapped: ReturnRequestRow = {
-          id: String(data.id),
-          status: (data.status as ReturnStatus) ?? 'รอดำเนินการ',
-          reason: data.reason ?? '',
-          images: Array.isArray(data.images) ? data.images : [],
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-          orderId: String(data.orderId),
-          items: Array.isArray(data.items)
-            ? data.items.map((it: any): ReturnItem => ({
-                id: String(it.id),
-                quantity: Number(it.quantity ?? 0),
-                orderItem: it.orderItem
-                  ? {
-                      id: String(it.orderItem.id ?? ''),
-                      size: String(it.orderItem.size ?? 'M') as SizeKey,
-                      product: it.orderItem.product
-                        ? {
-                            id: String(it.orderItem.product.id ?? ''),
-                            name: String(it.orderItem.product.name ?? ''),
-                            imageUrls: Array.isArray(it.orderItem.product.imageUrls)
-                              ? it.orderItem.product.imageUrls
-                              : [],
-                            code: it.orderItem.product.code ?? null,
-                          }
-                        : null,
-                    }
-                  : null,
-              }))
-            : [],
+          id: toStr(data.id),
+          status: (toStr(data.status) as ReturnStatus) || 'รอดำเนินการ',
+          reason: typeof data.reason === 'string' ? data.reason : '',
+          images: toStrArr(data.images),
+          createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined,
+          updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : undefined,
+          orderId: toStr(data.orderId),
+          items: itemsRaw.map((it): ReturnItem => ({
+            id: toStr(it.id),
+            quantity: toNum(it.quantity),
+            orderItem: it.orderItem
+              ? {
+                  id: toStr(it.orderItem.id ?? ''),
+                  size: toStr(it.orderItem.size ?? 'M') as SizeKey,
+                  product: it.orderItem.product
+                    ? {
+                        id: toStr(it.orderItem.product.id ?? ''),
+                        name: toStr(it.orderItem.product.name ?? ''),
+                        imageUrls: toStrArr(it.orderItem.product.imageUrls),
+                        code: typeof it.orderItem.product.code === 'string' ? it.orderItem.product.code : null,
+                      }
+                    : null,
+                }
+              : null,
+          })),
           order: data.order
             ? {
-                id: String(data.order.id),
-                trackingId: data.order.trackingId ?? null,
-                user: data.order.user ?? null,
+                id: toStr(data.order.id),
+                trackingId: typeof data.order.trackingId === 'string' ? data.order.trackingId : null,
+                user: data.order.user
+                  ? {
+                      name: typeof data.order.user.name === 'string' ? data.order.user.name : null,
+                      email: typeof data.order.user.email === 'string' ? data.order.user.email : null,
+                      phone: typeof data.order.user.phone === 'string' ? data.order.user.phone : null,
+                      address: typeof data.order.user.address === 'string' ? data.order.user.address : null,
+                    }
+                  : null,
               }
             : null,
         };
@@ -130,13 +184,13 @@ export default function ReturnProductDetailPage() {
         if (!ignore) setLoading(false);
       }
     };
+
     if (id) load();
     return () => { ignore = true; };
   }, [id]);
 
   const itemsTotal = useMemo(() => {
     if (!reqData) return 0;
-    // หน้านี้ไม่มีราคาคืนใน schema → แสดงจำนวนรวม
     return reqData.items.reduce((s, it) => s + (it.quantity || 0), 0);
   }, [reqData]);
 
@@ -150,12 +204,11 @@ export default function ReturnProductDetailPage() {
         body: JSON.stringify({ status }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'อัปเดตคำขอไม่สำเร็จ');
+      if (!res.ok) throw new Error((data as { error?: string } | null)?.error || 'อัปเดตคำขอไม่สำเร็จ');
 
-      // API จะลบคำขอคืนสินค้าทิ้งหลังอนุมัติ/ปฏิเสธ → ย้อนกลับ
       router.back();
-    } catch (e: any) {
-      setErr(e.message || 'อัปเดตคำขอไม่สำเร็จ');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'อัปเดตคำขอไม่สำเร็จ');
     } finally {
       setActing(null);
     }
@@ -168,17 +221,32 @@ export default function ReturnProductDetailPage() {
       setActing('delete');
       const res = await fetch(`/api/orders/return/${reqData.id}`, { method: 'DELETE' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'ลบคำขอไม่สำเร็จ');
+      if (!res.ok) throw new Error((data as { error?: string } | null)?.error || 'ลบคำขอไม่สำเร็จ');
       router.back();
-    } catch (e: any) {
-      setErr(e.message || 'ลบคำขอไม่สำเร็จ');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'ลบคำขอไม่สำเร็จ');
     } finally {
       setActing(null);
     }
   }
 
-  if (loading) return <div className={styles.page}><div className={styles.container}>กำลังโหลด…</div></div>;
-  if (err || !reqData) return <div className={styles.page}><div className={styles.container}><div className={styles.error}>❌ {err || 'ไม่พบคำขอคืนสินค้า'}</div></div></div>;
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.container}>กำลังโหลด…</div>
+      </div>
+    );
+  }
+
+  if (err || !reqData) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.container}>
+          <div className={styles.error}>❌ {err || 'ไม่พบคำขอคืนสินค้า'}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -309,9 +377,12 @@ export default function ReturnProductDetailPage() {
             ย้อนกลับ
           </button>
 
-          {/* ตัวเลือกเสริม: ลบคำขอ */}
           {String(reqData.status) !== 'approved' && String(reqData.status) !== 'rejected' && (
-            <button className={styles.btnGhostDanger} disabled={acting === 'delete'} onClick={doDelete}>
+            <button
+              className={styles.btnGhostDanger}
+              disabled={acting === 'delete'}
+              onClick={doDelete}
+            >
               {acting === 'delete' ? 'กำลังลบ…' : 'ลบคำขอ'}
             </button>
           )}

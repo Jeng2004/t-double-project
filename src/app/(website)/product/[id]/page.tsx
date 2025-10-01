@@ -18,6 +18,7 @@ type ProductDTO = {
   imageUrls?: string[];
   description?: string;
   stock?: Partial<Record<SizeKey, number | string>>;
+  category?: string | null; // ✅ เพิ่มหมวดหมู่
 };
 
 const toInt = (v: unknown): number => {
@@ -81,6 +82,18 @@ function Accordion({
       </div>
     </div>
   );
+}
+
+// ✅ helper: ตัดสินใจแสดง size guide จากหมวดหมู่
+function pickGuides(category?: string | null): { showGuide1: boolean; showGuide2: boolean } {
+  const c = (category ?? '').toLowerCase().trim();
+  const isTee = c.includes('เสื้อยืด') || c.includes('t-shirt') || c.includes('tshirt') || c.includes('tee');
+  const isLong = c.includes('เสื้อแขนยาว') || c.includes('long sleeve') || c.includes('long-sleeve');
+
+  if (isTee && !isLong) return { showGuide1: true, showGuide2: false };
+  if (isLong && !isTee) return { showGuide1: false, showGuide2: true };
+  // อื่น ๆ หรือไม่ระบุ → โชว์ทั้งสอง
+  return { showGuide1: true, showGuide2: true };
 }
 
 export default function ProductDetailsPage() {
@@ -153,13 +166,58 @@ export default function ProductDetailsPage() {
   };
 
   const startPrice = getDisplayPrice(item?.price);
-  const selectedPrice = selectedSize ? getPriceForSize(item?.price, selectedSize) : null;
+  const selectedPrice = selectedSize ? getPriceForSize(item?.price, selectedSize) : null; // (เผื่อใช้ในอนาคต)
   const selectedAvailable = selectedSize ? toInt(item?.stock?.[selectedSize]) : 0;
   const isOutAll =
     toInt(item?.stock?.S) + toInt(item?.stock?.M) + toInt(item?.stock?.L) + toInt(item?.stock?.XL) <= 0;
 
   const decQty = () => setQty((q) => Math.max(1, q - 1));
   const incQty = () => setQty((q) => Math.min(selectedAvailable || 1, q + 1));
+
+  const handleBuyNow = async () => {
+    if (!item || !selectedSize) return alert('กรุณาเลือกขนาดก่อน');
+    const available = selectedAvailable;
+    if (available <= 0) return alert('สินค้าหมดในไซส์นี้');
+    if (qty < 1) return alert('จำนวนอย่างน้อย 1 ชิ้น');
+    if (qty > available) return alert(`คงเหลือ ${available} ชิ้นในไซส์ ${selectedSize}`);
+
+    const unit = getPriceForSize(item.price, selectedSize);
+    if (unit == null || !Number.isFinite(unit)) {
+      return alert(`ไม่พบราคาไซส์ ${selectedSize}`);
+    }
+    const unitPrice = Number(unit);
+    const totalPrice = unitPrice * qty;
+
+    try {
+      setSubmitting(true);
+      const userId = getUserIdForFrontend();
+      if (!userId) {
+        alert('กรุณาเข้าสู่ระบบก่อนซื้อสินค้า');
+        return;
+      }
+
+      // เก็บ payload โหมดซื้อเลย
+      const payload = [
+        {
+          productId: String(item.id),
+          size: selectedSize,
+          quantity: qty,
+          price: unitPrice,
+          unitPrice,
+          totalPrice,
+          productName: item.name,
+          image: (item.imageUrls && item.imageUrls[0]) || '/placeholder.png',
+        },
+      ];
+      sessionStorage.setItem('buy-now-items', JSON.stringify(payload));
+
+      router.push('/payment?mode=buy-now');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'เกิดข้อผิดพลาดระหว่าง “ซื้อเลย”');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleAddToCart = async () => {
     if (!item || !selectedSize) return alert('กรุณาเลือกขนาดก่อน');
@@ -219,6 +277,9 @@ export default function ProductDetailsPage() {
 
   const imgs = item.imageUrls?.length ? item.imageUrls : ['/placeholder.png'];
 
+  // ✅ ตัดสินใจว่าจะแสดง size-guide ไหนบ้าง
+  const { showGuide1, showGuide2 } = pickGuides(item.category);
+
   return (
     <>
       <Navbar />
@@ -256,8 +317,7 @@ export default function ProductDetailsPage() {
           <div className={styles.detailColumn}>
             <h2 className={styles.title}>{item.name}</h2>
 
-            {/* ปุ่มไซส์ (ไม่มีตัวเลือกสี) */}
-            {/* ปุ่มไซส์ (ไม่มีตัวเลือกสี) */}
+            {/* ปุ่มไซส์ */}
             <div className={styles.sizeSection}>
               <p>ขนาด</p>
               <div className={styles.options}>
@@ -276,36 +336,47 @@ export default function ProductDetailsPage() {
                       onClick={() => { setSelectedSize(sz); setQty(1); }}
                       title={disabled ? 'หมดหรือไม่มีราคา' : `ไซซ์ ${sz}`}
                     >
-                      {/* ✅ แสดงเฉพาะไซซ์ */}
                       {sz}
                     </button>
                   );
                 })}
               </div>
 
-              {/* ✅ บรรทัดราคาใต้ไซซ์ (ตามไซซ์ที่เลือก) */}
+              {/* ราคาใต้ไซส์ */}
               <p className={styles.selectedPrice}>
-                ราคา: {
-                  selectedSize
-                    ? (getPriceForSize(item.price, selectedSize) != null
-                        ? `฿${formatTHB(getPriceForSize(item.price, selectedSize)!)}`
-                        : '-')
-                    : (startPrice != null ? `฿${formatTHB(startPrice)}` : '-')
-                }
+                ราคา:{' '}
+                {selectedSize
+                  ? (getPriceForSize(item.price, selectedSize) != null
+                      ? `฿${formatTHB(getPriceForSize(item.price, selectedSize)!)}`
+                      : '-')
+                  : (startPrice != null ? `฿${formatTHB(startPrice)}` : '-')}
               </p>
             </div>
-
 
             {/* จำนวน */}
             <div className={styles.qtyRow}>
               <span>จำนวน:</span>
               <div className={styles.quantityBox}>
-                <button type="button" onClick={decQty} disabled={!selectedSize || selectedAvailable <= 0 || qty <= 1}>−</button>
+                <button
+                  type="button"
+                  onClick={decQty}
+                  disabled={!selectedSize || selectedAvailable <= 0 || qty <= 1}
+                >
+                  −
+                </button>
                 <span>{qty}</span>
-                <button type="button" onClick={incQty} disabled={!selectedSize || selectedAvailable <= 0 || qty >= selectedAvailable}>+</button>
+                <button
+                  type="button"
+                  onClick={incQty}
+                  disabled={!selectedSize || selectedAvailable <= 0 || qty >= selectedAvailable}
+                >
+                  +
+                </button>
               </div>
               {selectedSize && (
-                <span className={styles.qtyHint}>คงเหลือ {selectedAvailable} ชิ้น (ไซส์ {selectedSize})</span>
+                <span className={styles.qtyHint}>
+                  คงเหลือ {selectedAvailable} ชิ้น (ไซส์ {selectedSize})
+                </span>
               )}
             </div>
 
@@ -334,22 +405,38 @@ export default function ProductDetailsPage() {
                 </table>
               </div>
 
-              {/* ✅ ย้ายรูปมาไว้ข้างล่างแทน */}
-              <Image
-                src="/size-guide.png"
-                alt="Size guide"
-                width={520}
-                height={360}
-                className={styles.sizeGuideBottom}
-                priority
-              />
+              {/* ✅ แสดง size guide ตามหมวดหมู่ */}
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
+                {showGuide1 && (
+                  <Image
+                    src="/size-guide.png"
+                    alt="Size guide (เสื้อยืด)"
+                    width={520}
+                    height={360}
+                    className={styles.sizeGuideBottom}
+                    priority
+                  />
+                )}
+                {showGuide2 && (
+                  <Image
+                    src="/size-guide2.png"
+                    alt="Size guide (เสื้อแขนยาว)"
+                    width={520}
+                    height={360}
+                    className={styles.sizeGuideBottom}
+                    priority
+                  />
+                )}
+              </div>
             </Accordion>
 
-
-
             <div className={styles.actions}>
-              <button className={styles.primary} disabled={!selectedSize || selectedAvailable <= 0 || submitting || isOutAll}>
-                ซื้อเลย
+              <button
+                className={styles.primary}
+                disabled={!selectedSize || selectedAvailable <= 0 || submitting || isOutAll}
+                onClick={handleBuyNow}
+              >
+                {isOutAll ? 'สินค้าหมด' : submitting ? 'กำลังไปหน้าเลือกชำระเงิน…' : 'ซื้อเลย'}
               </button>
               <button
                 className={styles.secondary}

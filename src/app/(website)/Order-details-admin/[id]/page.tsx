@@ -8,12 +8,15 @@ import NavbarAdmin from '../../components/NavbarAdmin';
 import styles from './Order-details-admin.module.css';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
+
+// ✅ เพิ่ม 'ลูกค้าคืนสินค้า'
 type AllowedStatus =
   | 'ยกเลิก'
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
-  | 'จัดส่งสินค้าสำเร็จเเล้ว'; // ← ตัด 'กำลังจัดส่งคืนสินค้า'
+  | 'จัดส่งสินค้าสำเร็จเเล้ว'
+  | 'ลูกค้าคืนสินค้า';
 
 type OrderItem = {
   id: string;
@@ -50,7 +53,7 @@ type OrderRow = {
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 const nf = (n: number) => { try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); } };
 
-// กันสถานะนอกลิสต์ให้เป็น 'รอดำเนินการ'
+// ✅ อัปเดตรายการ allowed ให้รวม 'ลูกค้าคืนสินค้า'
 const normalizeStatus = (s: unknown): AllowedStatus => {
   const allowed: AllowedStatus[] = [
     'ยกเลิก',
@@ -58,19 +61,28 @@ const normalizeStatus = (s: unknown): AllowedStatus => {
     'กำลังดำเนินการจัดเตรียมสินค้า',
     'กำลังดำเนินการจัดส่งสินค้า',
     'จัดส่งสินค้าสำเร็จเเล้ว',
+    'ลูกค้าคืนสินค้า',
   ];
   const str = String(s ?? '');
   return (allowed as string[]).includes(str) ? (str as AllowedStatus) : 'รอดำเนินการ';
 };
 
+// ✅ เพิ่มกรณี 'ลูกค้าคืนสินค้า' ให้มี badge ของตัวเอง
 const statusBadgeClass = (status: AllowedStatus) => {
   switch (status) {
-    case 'รอดำเนินการ': return `${styles.badge} ${styles.badgePending}`;
-    case 'กำลังดำเนินการจัดเตรียมสินค้า': return `${styles.badge} ${styles.badgePreparing}`;
-    case 'กำลังดำเนินการจัดส่งสินค้า': return `${styles.badge} ${styles.badgeShipping}`;
-    case 'จัดส่งสินค้าสำเร็จเเล้ว': return `${styles.badge} ${styles.badgeSuccess}`;
+    case 'รอดำเนินการ':
+      return `${styles.badge} ${styles.badgePending}`;
+    case 'กำลังดำเนินการจัดเตรียมสินค้า':
+      return `${styles.badge} ${styles.badgePreparing}`;
+    case 'กำลังดำเนินการจัดส่งสินค้า':
+      return `${styles.badge} ${styles.badgeShipping}`;
+    case 'จัดส่งสินค้าสำเร็จเเล้ว':
+      return `${styles.badge} ${styles.badgeSuccess}`;
+    case 'ลูกค้าคืนสินค้า':
+      return `${styles.badge} ${styles.badgeReturn}`;
     case 'ยกเลิก':
-    default: return `${styles.badge} ${styles.badgeCancel}`;
+    default:
+      return `${styles.badge} ${styles.badgeCancel}`;
   }
 };
 
@@ -119,7 +131,7 @@ export default function OrderDetailsAdminPage() {
         const mapped: OrderRow = {
           id: String(data.id ?? ''),
           trackingId: data.trackingId ?? null,
-          status: normalizeStatus(data.status), // ← ปรับให้ปลอดภัย
+          status: normalizeStatus(data.status),
           createdAt: String(data.createdAt ?? ''),
           createdAtThai: data.createdAtThai ?? null,
           totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : null,
@@ -200,8 +212,8 @@ export default function OrderDetailsAdminPage() {
       <NavbarAdmin />
       <div className={styles.page}>
         <div className={styles.container}>
-          {/* 1) รายละเอียดคำสั่งซื้อ */}
           <h1 className={styles.title}>รายละเอียดคำสั่งซื้อ</h1>
+
           <div className={styles.infoGrid}>
             <div className={styles.infoLabel}>เลขที่คำสั่งซื้อ:</div>
             <div className={styles.infoValue}>ORD-{order.id}</div>
@@ -212,7 +224,6 @@ export default function OrderDetailsAdminPage() {
             </div>
           </div>
 
-          {/* 1.1 ข้อมูลลูกค้า */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลลูกค้า</h3>
             <div className={styles.recipientCard}>
@@ -239,7 +250,6 @@ export default function OrderDetailsAdminPage() {
             </div>
           </section>
 
-          {/* 2) สินค้าในคำสั่งซื้อ */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>สินค้าในคำสั่งซื้อ</h3>
             {order.orderItems.map((it) => (
@@ -268,7 +278,6 @@ export default function OrderDetailsAdminPage() {
             ))}
           </section>
 
-          {/* 3) ข้อมูลการชำระเงิน */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลการชำระเงิน</h3>
             <div className={styles.infoGrid}>
@@ -280,8 +289,6 @@ export default function OrderDetailsAdminPage() {
             </div>
 
             <div className={styles.sectionTitle} style={{ marginTop: 12 }}>Payment Verification</div>
-
-            {/* สลิปจำลอง */}
             <div className={styles.fakeSlip}>
               <div className={styles.fakeSlipHeader}>PAYMENT SLIP (DEMO)</div>
               <div className={styles.fakeSlipBody}>
@@ -294,9 +301,8 @@ export default function OrderDetailsAdminPage() {
             </div>
           </section>
 
-          {/* ปุ่ม */}
           <div className={styles.actions}>
-            {/* เฉพาะ 'รอดำเนินการ' ให้กด Confirm/Cancel */}
+            {/* แสดงปุ่มเฉพาะตอน 'รอดำเนินการ' เท่านั้น */}
             {order.status === 'รอดำเนินการ' && (
               <>
                 <button
@@ -306,7 +312,6 @@ export default function OrderDetailsAdminPage() {
                 >
                   {act === 'confirm' ? 'กำลังคอนเฟิร์ม…' : 'Confirm Order'}
                 </button>
-
                 <button
                   className={styles.btnDanger}
                   disabled={act === 'cancel'}
