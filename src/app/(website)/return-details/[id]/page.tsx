@@ -7,7 +7,7 @@ import styles from './return-details.module.css';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
 
-type ReturnStatus = 'รอดำเนินการ' | 'approved' | 'rejected';
+type ReturnStatus = 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ';
 
 type ReturnItem = {
   id: string;
@@ -26,7 +26,7 @@ type ReturnItem = {
 
 type ReturnRequestRow = {
   id: string;
-  status: ReturnStatus | string; // api อาจส่งเป็น string
+  status: ReturnStatus | string;
   reason?: string | null;
   images?: string[];
   createdAt?: string;
@@ -59,8 +59,8 @@ const fmtTH = (d?: string) => {
 const badgeClass = (s: string) => {
   switch (s) {
     case 'รอดำเนินการ': return `${styles.badge} ${styles.badgePending}`;
-    case 'approved':     return `${styles.badge} ${styles.badgeSuccess}`;
-    case 'rejected':     return `${styles.badge} ${styles.badgeCancel}`;
+    case 'อนุมัติ':      return `${styles.badge} ${styles.badgeSuccess}`;
+    case 'ปฏิเสธ':       return `${styles.badge} ${styles.badgeCancel}`;
     default:             return `${styles.badge} ${styles.badgePending}`;
   }
 };
@@ -72,7 +72,7 @@ export default function ReturnProductDetailPage() {
   const [reqData, setReqData] = useState<ReturnRequestRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [acting, setActing] = useState<'approve' | 'reject' | 'delete' | null>(null);
+  const [acting, setActing] = useState<'อนุมัติ' | 'ปฏิเสธ' | 'delete' | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -86,7 +86,7 @@ export default function ReturnProductDetailPage() {
 
         const mapped: ReturnRequestRow = {
           id: String(data.id),
-          status: (data.status as ReturnStatus) ?? 'รอดำเนินการ',
+          status: data.status === 'approved' ? 'อนุมัติ' : data.status === 'rejected' ? 'ปฏิเสธ' : 'รอดำเนินการ',
           reason: data.reason ?? '',
           images: Array.isArray(data.images) ? data.images : [],
           createdAt: data.createdAt,
@@ -136,23 +136,21 @@ export default function ReturnProductDetailPage() {
 
   const itemsTotal = useMemo(() => {
     if (!reqData) return 0;
-    // หน้านี้ไม่มีราคาคืนใน schema → แสดงจำนวนรวม
     return reqData.items.reduce((s, it) => s + (it.quantity || 0), 0);
   }, [reqData]);
 
-  async function doPatch(status: 'approved' | 'rejected') {
+  async function doPatch(status: 'อนุมัติ' | 'ปฏิเสธ') {
     if (!reqData) return;
     try {
-      setActing(status === 'approved' ? 'approve' : 'reject');
+      setActing(status);
+      const apiStatus = status === 'อนุมัติ' ? 'approved' : 'rejected';
       const res = await fetch(`/api/orders/return/${reqData.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: apiStatus }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'อัปเดตคำขอไม่สำเร็จ');
-
-      // API จะลบคำขอคืนสินค้าทิ้งหลังอนุมัติ/ปฏิเสธ → ย้อนกลับ
       router.back();
     } catch (e: any) {
       setErr(e.message || 'อัปเดตคำขอไม่สำเร็จ');
@@ -183,7 +181,6 @@ export default function ReturnProductDetailPage() {
   return (
     <div className={styles.page}>
       <div className={styles.container}>
-        {/* หัวเรื่อง */}
         <h1 className={styles.title}>รายละเอียดคำขอคืนสินค้า</h1>
 
         <div className={styles.infoGrid}>
@@ -255,7 +252,7 @@ export default function ReturnProductDetailPage() {
           </div>
         </section>
 
-        {/* เหตุผลการคืนสินค้า */}
+        {/* เหตุผล */}
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>เหตุผลการคืนสินค้า</h3>
           <div className={styles.reasonBox}>{reqData.reason || '-'}</div>
@@ -283,24 +280,24 @@ export default function ReturnProductDetailPage() {
           )}
         </section>
 
-        {/* ปุ่มสำหรับแอดมิน */}
+        {/* ปุ่ม */}
         <div className={styles.actions}>
           {String(reqData.status) === 'รอดำเนินการ' && (
             <>
               <button
                 className={styles.btnPrimary}
-                disabled={acting === 'approve'}
-                onClick={() => doPatch('approved')}
+                disabled={acting === 'อนุมัติ'}
+                onClick={() => doPatch('อนุมัติ')}
               >
-                {acting === 'approve' ? 'กำลังอนุมัติ…' : 'Approve Return'}
+                {acting === 'อนุมัติ' ? 'กำลังอนุมัติ…' : 'อนุมัติ'}
               </button>
 
               <button
                 className={styles.btnDanger}
-                disabled={acting === 'reject'}
-                onClick={() => doPatch('rejected')}
+                disabled={acting === 'ปฏิเสธ'}
+                onClick={() => doPatch('ปฏิเสธ')}
               >
-                {acting === 'reject' ? 'กำลังปฏิเสธ…' : 'Reject'}
+                {acting === 'ปฏิเสธ' ? 'กำลังปฏิเสธ…' : 'ปฏิเสธ'}
               </button>
             </>
           )}
@@ -309,8 +306,7 @@ export default function ReturnProductDetailPage() {
             ย้อนกลับ
           </button>
 
-          {/* ตัวเลือกเสริม: ลบคำขอ */}
-          {String(reqData.status) !== 'approved' && String(reqData.status) !== 'rejected' && (
+          {String(reqData.status) !== 'อนุมัติ' && String(reqData.status) !== 'ปฏิเสธ' && (
             <button className={styles.btnGhostDanger} disabled={acting === 'delete'} onClick={doDelete}>
               {acting === 'delete' ? 'กำลังลบ…' : 'ลบคำขอ'}
             </button>
