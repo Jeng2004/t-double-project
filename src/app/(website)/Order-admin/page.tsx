@@ -1,4 +1,3 @@
-// src/app/(website)/Order-admin/page.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +10,8 @@ type AllowedStatus =
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
-  | 'จัดส่งสินค้าสำเร็จเเล้ว'; // ← ตัด 'กำลังจัดส่งคืนสินค้า' ออก
+  | 'จัดส่งสินค้าสำเร็จเเล้ว'
+  | 'ลูกค้าคืนสินค้า'; // ✅ รองรับสถานะคืนสินค้า
 
 type OrderItem = {
   id: string;
@@ -38,7 +38,8 @@ const STATUS_LIST: AllowedStatus[] = [
   'กำลังดำเนินการจัดเตรียมสินค้า',
   'กำลังดำเนินการจัดส่งสินค้า',
   'จัดส่งสินค้าสำเร็จเเล้ว',
-]; // ← ตัด 'กำลังจัดส่งคืนสินค้า' ออก
+  'ลูกค้าคืนสินค้า', // ✅ เพิ่มในรายการเลือก
+];
 
 const fmtTH = (iso: string, thai?: string | null) => {
   if (thai && thai.trim()) return thai;
@@ -49,11 +50,7 @@ const fmtTH = (iso: string, thai?: string | null) => {
   }
 };
 const nf = (n: number) => {
-  try {
-    return new Intl.NumberFormat('th-TH').format(n);
-  } catch {
-    return String(n);
-  }
+  try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); }
 };
 
 export default function OrderAdmin2Page() {
@@ -64,7 +61,6 @@ export default function OrderAdmin2Page() {
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState('');
 
-  // popover state
   const [openForId, setOpenForId] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<AllowedStatus | null>(null);
   const [saving, setSaving] = useState(false);
@@ -85,7 +81,6 @@ export default function OrderAdmin2Page() {
           return;
         }
 
-        // helpers
         const toStr = (v: unknown) => (typeof v === 'string' ? v : String(v ?? ''));
         const toNum = (v: unknown) => {
           const n = Number(v);
@@ -99,7 +94,6 @@ export default function OrderAdmin2Page() {
         const mapped: OrderRow[] = raw.map((o): OrderRow => {
           const ro = (o ?? {}) as Record<string, unknown>;
 
-          // orderItems → แปลงอย่างปลอดภัย
           const itemsRaw = Array.isArray(ro.orderItems) ? ro.orderItems : [];
           const orderItems: OrderItem[] = itemsRaw.map((it): OrderItem => {
             const r = (it ?? {}) as Record<string, unknown>;
@@ -124,12 +118,7 @@ export default function OrderAdmin2Page() {
             createdAtThai: ro.createdAtThai == null ? null : toStr(ro.createdAtThai),
             totalAmount: typeof ro.totalAmount === 'number' ? ro.totalAmount : null,
             orderItems,
-            user: u
-              ? {
-                  name: (u.name as string | null | undefined) ?? null,
-                  email: (u.email as string | null | undefined) ?? null,
-                }
-              : null,
+            user: u ? { name: (u.name as string | null | undefined) ?? null, email: (u.email as string | null | undefined) ?? null } : null,
           };
         });
 
@@ -157,13 +146,12 @@ export default function OrderAdmin2Page() {
   const calcTotal = (r: OrderRow): number => {
     if (typeof r.totalAmount === 'number') return r.totalAmount;
     return (r.orderItems ?? []).reduce((acc, it) => {
-      const line =
-        it.totalPrice ??
-        (typeof it.unitPrice === 'number' ? it.unitPrice * (it.quantity || 0) : 0);
+      const line = it.totalPrice ?? (typeof it.unitPrice === 'number' ? it.unitPrice * (it.quantity || 0) : 0);
       return acc + (line || 0);
     }, 0);
   };
 
+  // ✅ สีสถานะให้ตรงกับหน้าแสดงออเดอร์ (badge*)
   const pillClass = (s: AllowedStatus) => {
     switch (s) {
       case 'ยกเลิก':
@@ -175,8 +163,11 @@ export default function OrderAdmin2Page() {
       case 'กำลังดำเนินการจัดส่งสินค้า':
         return `${styles.pill} ${styles.pillShipping}`;
       case 'จัดส่งสินค้าสำเร็จเเล้ว':
-      default:
         return `${styles.pill} ${styles.pillCompleted}`;
+      case 'ลูกค้าคืนสินค้า':
+        return `${styles.pill} ${styles.pillReturn}`;
+      default:
+        return styles.pill;
     }
   };
 
@@ -191,9 +182,7 @@ export default function OrderAdmin2Page() {
   };
 
   useEffect(() => {
-    const onEsc = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') closePopover();
-    };
+    const onEsc = (ev: KeyboardEvent) => { if (ev.key === 'Escape') closePopover(); };
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
   }, []);
@@ -210,9 +199,7 @@ export default function OrderAdmin2Page() {
       });
       if (!res.ok) throw new Error(`PATCH ${res.status}: ${await res.text()}`);
 
-      setRows((prev) =>
-        prev.map((r) => (r.id === openForId ? { ...r, status: draftStatus } : r))
-      );
+      setRows((prev) => prev.map((r) => (r.id === openForId ? { ...r, status: draftStatus } : r)));
       closePopover();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'อัปเดตไม่สำเร็จ');
@@ -261,9 +248,7 @@ export default function OrderAdmin2Page() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className={styles.empty}>
-                      ไม่พบคำสั่งซื้อ
-                    </td>
+                    <td colSpan={5} className={styles.empty}>ไม่พบคำสั่งซื้อ</td>
                   </tr>
                 ) : (
                   filtered.map((r) => (
@@ -273,9 +258,7 @@ export default function OrderAdmin2Page() {
                           type="button"
                           className={styles.linkBtn}
                           onClick={() => goToDetails(r.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') goToDetails(r.id);
-                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') goToDetails(r.id); }}
                           title="ดูรายละเอียดคำสั่งซื้อ"
                         >
                           #{r.id}
@@ -305,17 +288,10 @@ export default function OrderAdmin2Page() {
 
       {openForId && (
         <>
-          <div
-            ref={overlayRef}
-            className={styles.overlay}
-            onClick={closePopover}
-          />
+          <div ref={overlayRef} className={styles.overlay} onClick={closePopover} />
           <div
             className={styles.popover}
-            style={{
-              left: Math.max(16, popPos.x - 160),
-              top: Math.max(16, popPos.y + 10),
-            }}
+            style={{ left: Math.max(16, popPos.x - 160), top: Math.max(16, popPos.y + 10) }}
             role="dialog"
             aria-modal="true"
           >
@@ -334,18 +310,8 @@ export default function OrderAdmin2Page() {
               ))}
             </div>
             <div className={styles.popActions}>
-              <button
-                className={styles.btnGhost}
-                onClick={closePopover}
-                disabled={saving}
-              >
-                ยกเลิก
-              </button>
-              <button
-                className={styles.btnPrimary}
-                onClick={saveStatus}
-                disabled={saving || !draftStatus}
-              >
+              <button className={styles.btnGhost} onClick={closePopover} disabled={saving}>ยกเลิก</button>
+              <button className={styles.btnPrimary} onClick={saveStatus} disabled={saving || !draftStatus}>
                 {saving ? 'กำลังอัปเดต…' : 'ยืนยัน'}
               </button>
             </div>

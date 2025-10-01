@@ -7,6 +7,7 @@ import styles from './return-details.module.css';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
 
+
 type ReturnStatus = 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ';
 
 type ReturnItem = {
@@ -45,6 +46,7 @@ type ReturnRequestRow = {
   } | null;
 };
 
+/* ---------- Helpers for formatting ---------- */
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 const nf = (n: number) => { try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); } };
 const fmtTH = (d?: string) => {
@@ -55,7 +57,6 @@ const fmtTH = (d?: string) => {
     return d;
   }
 };
-
 const badgeClass = (s: string) => {
   switch (s) {
     case 'รอดำเนินการ': return `${styles.badge} ${styles.badgePending}`;
@@ -64,6 +65,51 @@ const badgeClass = (s: string) => {
     default:             return `${styles.badge} ${styles.badgePending}`;
   }
 };
+
+/* ---------- Raw API types + safe casters ---------- */
+type ApiReturnItemRaw = {
+  id?: unknown;
+  quantity?: unknown;
+  orderItem?: {
+    id?: unknown;
+    size?: unknown;
+    product?: {
+      id?: unknown;
+      name?: unknown;
+      imageUrls?: unknown;
+      code?: unknown;
+    } | null;
+  } | null;
+};
+
+type ApiReturnRequestRaw = {
+  id?: unknown;
+  status?: unknown;
+  reason?: unknown;
+  images?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  orderId?: unknown;
+  items?: unknown;
+  order?: {
+    id?: unknown;
+    trackingId?: unknown;
+    user?: {
+      name?: unknown;
+      email?: unknown;
+      phone?: unknown;
+      address?: unknown;
+    } | null;
+  } | null;
+};
+
+const toStr = (v: unknown): string => (typeof v === 'string' ? v : String(v ?? ''));
+const toNum = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const toStrArr = (v: unknown): string[] =>
+  Array.isArray(v) ? (v.filter((x): x is string => typeof x === 'string')) : [];
 
 export default function ReturnProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,11 +126,19 @@ export default function ReturnProductDetailPage() {
       try {
         setLoading(true);
         setErr(null);
+
         const res = await fetch(`/api/orders/return/${id}`, { cache: 'no-store' });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'โหลดคำขอคืนสินค้าไม่สำเร็จ');
+        const dataUnknown: unknown = await res.json();
+        if (!res.ok) {
+          const msg = (dataUnknown as { error?: string } | null)?.error ?? 'โหลดคำขอคืนสินค้าไม่สำเร็จ';
+          throw new Error(msg);
+        }
+        const data = dataUnknown as ApiReturnRequestRaw;
+
+        const itemsRaw: ApiReturnItemRaw[] = Array.isArray(data.items) ? (data.items as ApiReturnItemRaw[]) : [];
 
         const mapped: ReturnRequestRow = {
+
           id: String(data.id),
           status: data.status === 'approved' ? 'อนุมัติ' : data.status === 'rejected' ? 'ปฏิเสธ' : 'รอดำเนินการ',
           reason: data.reason ?? '',
@@ -97,28 +151,14 @@ export default function ReturnProductDetailPage() {
                 id: String(it.id),
                 quantity: Number(it.quantity ?? 0),
                 orderItem: it.orderItem
+
                   ? {
-                      id: String(it.orderItem.id ?? ''),
-                      size: String(it.orderItem.size ?? 'M') as SizeKey,
-                      product: it.orderItem.product
-                        ? {
-                            id: String(it.orderItem.product.id ?? ''),
-                            name: String(it.orderItem.product.name ?? ''),
-                            imageUrls: Array.isArray(it.orderItem.product.imageUrls)
-                              ? it.orderItem.product.imageUrls
-                              : [],
-                            code: it.orderItem.product.code ?? null,
-                          }
-                        : null,
+                      name: typeof data.order.user.name === 'string' ? data.order.user.name : null,
+                      email: typeof data.order.user.email === 'string' ? data.order.user.email : null,
+                      phone: typeof data.order.user.phone === 'string' ? data.order.user.phone : null,
+                      address: typeof data.order.user.address === 'string' ? data.order.user.address : null,
                     }
                   : null,
-              }))
-            : [],
-          order: data.order
-            ? {
-                id: String(data.order.id),
-                trackingId: data.order.trackingId ?? null,
-                user: data.order.user ?? null,
               }
             : null,
         };
@@ -130,6 +170,7 @@ export default function ReturnProductDetailPage() {
         if (!ignore) setLoading(false);
       }
     };
+
     if (id) load();
     return () => { ignore = true; };
   }, [id]);
@@ -150,10 +191,11 @@ export default function ReturnProductDetailPage() {
         body: JSON.stringify({ status: apiStatus }),
       });
       const data = await res.json();
+
       if (!res.ok) throw new Error(data?.error || 'อัปเดตคำขอไม่สำเร็จ');
       router.back();
-    } catch (e: any) {
-      setErr(e.message || 'อัปเดตคำขอไม่สำเร็จ');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'อัปเดตคำขอไม่สำเร็จ');
     } finally {
       setActing(null);
     }
@@ -166,17 +208,32 @@ export default function ReturnProductDetailPage() {
       setActing('delete');
       const res = await fetch(`/api/orders/return/${reqData.id}`, { method: 'DELETE' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'ลบคำขอไม่สำเร็จ');
+      if (!res.ok) throw new Error((data as { error?: string } | null)?.error || 'ลบคำขอไม่สำเร็จ');
       router.back();
-    } catch (e: any) {
-      setErr(e.message || 'ลบคำขอไม่สำเร็จ');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'ลบคำขอไม่สำเร็จ');
     } finally {
       setActing(null);
     }
   }
 
-  if (loading) return <div className={styles.page}><div className={styles.container}>กำลังโหลด…</div></div>;
-  if (err || !reqData) return <div className={styles.page}><div className={styles.container}><div className={styles.error}>❌ {err || 'ไม่พบคำขอคืนสินค้า'}</div></div></div>;
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.container}>กำลังโหลด…</div>
+      </div>
+    );
+  }
+
+  if (err || !reqData) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.container}>
+          <div className={styles.error}>❌ {err || 'ไม่พบคำขอคืนสินค้า'}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -305,6 +362,7 @@ export default function ReturnProductDetailPage() {
           <button className={styles.btnGhost} onClick={() => router.back()}>
             ย้อนกลับ
           </button>
+
 
           {String(reqData.status) !== 'อนุมัติ' && String(reqData.status) !== 'ปฏิเสธ' && (
             <button className={styles.btnGhostDanger} disabled={acting === 'delete'} onClick={doDelete}>

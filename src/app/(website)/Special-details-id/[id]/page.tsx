@@ -29,8 +29,8 @@ type SpecialOrder = {
   phone?: string | null;
   address?: string | null;
 
-  isApproved?: boolean | null;          // ช่วยตัดสินใจเรื่องยกเลิก/คืน
-  paymentIntentId?: string | null;      // ใช้ในคืนเงิน (ฝั่งแบ็กเอนด์เช็กอยู่แล้ว)
+  isApproved?: boolean | null;
+  paymentIntentId?: string | null; // ใช้ยืนยันว่ามีข้อมูลการชำระเงิน (สำหรับคืนเงิน)
   paymentUrl?: string | null;
 };
 
@@ -127,16 +127,35 @@ export default function SpecialDetailsPage() {
   const phone = order?.user?.phone || order?.phone || '-';
   const address = order?.user?.address || order?.address || '-';
 
-  // เงื่อนไขเปิด/ปิดปุ่ม (เช็กแบบคร่าว ๆ — ฝั่ง API เป็นตัวตัดสินสุดท้าย)
+  // ── เงื่อนไขควบคุมปุ่ม/ป้าย (UI) ─────────────────────────────
   const s = (order?.status || '').toString();
-  const isShipping = s.includes('กำลังดำเนินการจัดส่ง');
-  const isDelivered = s.includes('จัดส่งสินค้าสำเร็จ');
-  const isWaitingPayment = s.includes('รอชำระ');
-  const canCancelUI = !!order && !isShipping && !isDelivered && !isWaitingPayment; // จ่ายแล้ว + ยังไม่ส่ง
-  const canReturnUI = !!order && isDelivered;                                      // คืนได้เมื่อจัดส่งสำเร็จ
+  const isShipping = /กำลังดำเนินการจัดส่ง/.test(s);
+  const isDelivered = /จัดส่งสินค้าสำเร็จ/.test(s);
+  const isWaitingPayment = /รอชำระ/.test(s);                      // ยังไม่ชำระเงิน
+  const hasPaymentRef = Boolean(order?.paymentIntentId);           // มีหลักฐานการชำระ (ใช้คืนเงินได้)
+  // ให้ "ชำระแล้ว" เฉพาะกรณีไม่อยู่ในรอชำระ และมีข้อมูลการชำระเงินจริง
+  const isPaid = !isWaitingPayment && hasPaymentRef;
+
+  // สาเหตุที่บล็อกการยกเลิก (ใช้โชว์บนป้าย และ alert)
+  const cancelBlockReason =
+    !order ? 'ไม่พบคำสั่งซื้อ' :
+    isWaitingPayment ? 'ยังไม่ชำระเงิน' :
+    !hasPaymentRef ? 'ไม่พบข้อมูลการชำระเงิน' :
+    isShipping ? 'กำลังจัดส่ง' :
+    isDelivered ? 'จัดส่งสินค้าสำเร็จแล้ว' :
+    null;
+
+  // ยกเลิกได้เฉพาะเมื่อไม่มีเหตุบล็อกใด ๆ
+  const canCancelUI = !!order && !cancelBlockReason;
+  // คืนได้: เมื่อจัดส่งสำเร็จ
+  const canReturnUI = !!order && isDelivered;
 
   async function handleCancel() {
     if (!order) return;
+    if (!canCancelUI) {
+      alert(cancelBlockReason ?? 'สถานะไม่พร้อมสำหรับการยกเลิก');
+      return;
+    }
     try {
       setCanceling(true);
       setCancelMsg(null);
@@ -146,13 +165,14 @@ export default function SpecialDetailsPage() {
         body: JSON.stringify({ orderId: order.id, reason: cancelReason || 'ไม่ระบุเหตุผล' }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'ยกเลิกคำสั่งซื้อไม่สำเร็จ');
+      if (!res.ok) throw new Error((data && data.error) || 'ยกเลิกคำสั่งซื้อไม่สำเร็จ');
       setCancelMsg('✅ ยกเลิกคำสั่งซื้อและคืนเงินเรียบร้อย');
-      // รีโหลดข้อมูล
+
+      // รีโหลดข้อมูลล่าสุด
       const fresh = await fetch(`/api/special-orders/${order.id}`, { cache: 'no-store' });
       if (fresh.ok) setOrder(await fresh.json());
     } catch (e) {
-      setCancelMsg(`❌ ${(e as Error).message}`);
+      setCancelMsg(`❌ ${e instanceof Error ? e.message : 'เกิดข้อผิดพลาด'}`);
     } finally {
       setCanceling(false);
     }
@@ -172,12 +192,11 @@ export default function SpecialDetailsPage() {
 
       const res = await fetch('/api/return-special-orders', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'ส่งคำขอคืนสินค้าไม่สำเร็จ');
+      if (!res.ok) throw new Error((data && data.error) || 'ส่งคำขอคืนสินค้าไม่สำเร็จ');
       setReturnMsg('✅ ส่งคำขอคืนสินค้าเรียบร้อย (รอตรวจสอบ)');
       setReturnFiles(null);
-      // ไม่จำเป็นต้องรีโหลดสถานะออเดอร์ทันที
     } catch (e) {
-      setReturnMsg(`❌ ${(e as Error).message}`);
+      setReturnMsg(`❌ ${e instanceof Error ? e.message : 'เกิดข้อผิดพลาด'}`);
     } finally {
       setReturning(false);
     }
@@ -212,16 +231,14 @@ export default function SpecialDetailsPage() {
         <div className={styles.container}>
           <h1 className={styles.title}>รายละเอียดคำสั่งซื้อ</h1>
 
-          {/* หมายเลขคำสั่งซื้อ (ORD-xxx ตัวหนา) */}
+          {/* หมายเลขคำสั่งซื้อ */}
           <div className={styles.orderLine}>
             <span className={styles.orderIdLabel}>หมายเลขคำสั่งซื้อ:</span>
             <span className={styles.orderIdValue}><b>ORD-{order.id}</b></span>
           </div>
 
-          {/* หัวข้อ "ข้อมูลคำสั่งซื้อ" (ตัวหนา) */}
+          {/* ข้อมูลคำสั่งซื้อ */}
           <div className={styles.infoHeader}><b>ข้อมูลคำสั่งซื้อ</b></div>
-
-          {/* ตาราง 2 คอลัมน์: ซ้าย label / ขวา value (4 บรรทัดรวมยอด) */}
           <div className={styles.infoGrid}>
             <div className={styles.infoLabel}>วันที่สั่งซื้อ</div>
             <div className={styles.infoValue}>{order.createdAtThai ?? order.createdAt ?? '-'}</div>
@@ -236,13 +253,13 @@ export default function SpecialDetailsPage() {
             <div className={styles.infoValue}>{total ? `฿${nf(total)}` : '-'}</div>
           </div>
 
-          {/* หัวข้อ “สถานะคำสั่งซื้อ/รายละเอียดสินค้า” + สถานะชิดขวาสุด */}
+          {/* สถานะคำสั่งซื้อ/รายละเอียดสินค้า */}
           <div className={styles.sectionTitleRow}>
             <span className={styles.sectionTitle}>สถานะคำสั่งซื้อ/รายละเอียดสินค้า</span>
             <span className={styles.badge}>{order.status || '-'}</span>
           </div>
 
-          {/* กล่องสินค้า (รูปซ้าย) */}
+          {/* กล่องสินค้า */}
           <div className={styles.itemRow}>
             <div className={styles.thumbBox}>
               <Image src="/special.png" alt="special" width={120} height={120} className={styles.thumb} />
@@ -261,14 +278,14 @@ export default function SpecialDetailsPage() {
             </div>
           </div>
 
-          {/* เว้นวรรค + ข้อมูลการจัดส่ง */}
+          {/* ข้อมูลการจัดส่ง */}
           <h3 className={styles.sectionTitleSpaced}>ข้อมูลการจัดส่ง</h3>
           <div className={styles.trackingRow}>
             <div className={styles.trackingLabel}>หมายเลขติดตามพัสดุ</div>
             <div className={styles.trackingValue}>{order.trackingId || '-'}</div>
           </div>
 
-          {/* เว้นวรรค + ผู้สั่งซื้อ */}
+          {/* ข้อมูลผู้สั่งซื้อ */}
           <h3 className={styles.sectionTitleSpaced}>ข้อมูลผู้สั่งซื้อ</h3>
           <div className={styles.recipientCard}>
             <div className={styles.recRow}>
@@ -293,17 +310,15 @@ export default function SpecialDetailsPage() {
             </div>
           </div>
 
-          {/* ─────────────────────────────────────────────
-              การดำเนินการ: ยกเลิก / คืนสินค้า
-              ──────────────────────────────────────────── */}
+          {/* การดำเนินการกับคำสั่งซื้อ */}
           <h3 className={styles.sectionTitleSpaced}>การดำเนินการกับคำสั่งซื้อ</h3>
 
           {/* กล่องยกเลิกคำสั่งซื้อ */}
-          <div className={styles.actionCard}>
+          <div className={styles.actionCard} aria-disabled={!canCancelUI}>
             <div className={styles.actionHeader}>
               <div className={styles.actionTitle}>ยกเลิกคำสั่งซื้อ</div>
               <span className={`${styles.pill} ${canCancelUI ? styles.pillWarn : styles.pillDisabled}`}>
-                {canCancelUI ? 'พร้อมดำเนินการ' : 'ไม่สามารถยกเลิกได้'}
+                {canCancelUI ? 'พร้อมดำเนินการ' : (cancelBlockReason ?? 'ไม่พร้อม')}
               </span>
             </div>
             <div className={styles.actionBody}>
@@ -329,7 +344,7 @@ export default function SpecialDetailsPage() {
           </div>
 
           {/* กล่องคืนสินค้า */}
-          <div className={styles.actionCard}>
+          <div className={styles.actionCard} aria-disabled={!canReturnUI}>
             <div className={styles.actionHeader}>
               <div className={styles.actionTitle}>ส่งคำขอคืนสินค้า</div>
               <span className={`${styles.pill} ${canReturnUI ? styles.pillInfo : styles.pillDisabled}`}>

@@ -146,16 +146,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <button
-        className={styles.logoutButton}
-        onClick={async () => {
-          await fetch('/api/logout', { method: 'POST' });
-          localStorage.removeItem('userId');
-          window.location.href = '/login';
-        }}
-      >
-        LOGOUT
-      </button>
+
 
       {showEditProfile && <EditProfile onClose={() => setShowEditProfile(false)} />}
     </>

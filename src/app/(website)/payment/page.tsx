@@ -1,3 +1,4 @@
+// src/app/(website)/payment/page.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -5,6 +6,7 @@ import styles from './payment.module.css';
 import Image from 'next/image';
 import Navbar from '../components/Navbar';
 import { getUserIdForFrontend } from '@/lib/get-user-id';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
 
@@ -36,6 +38,17 @@ type UserProfile = {
   address?: string | null;
 };
 
+type BuyNowItem = {
+  productId: string;
+  size: SizeKey;
+  quantity: number;
+  price: number;
+  unitPrice: number;
+  totalPrice: number;
+  productName?: string;
+  image?: string;
+};
+
 const formatNumber = (n: number) => {
   try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); }
 };
@@ -52,10 +65,23 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const isUserProfile = (u: unknown): u is UserProfile =>
   isRecord(u) && typeof u.id === 'string' && typeof u.email === 'string' && typeof u.name === 'string';
 
-// ---------- NEW: วิธีชำระเงิน ----------
+// วิธีชำระเงิน
 type PayMethod = 'stripe' | 'manual';
 
+// กัน HTML error
+async function readJsonSafe(res: Response) {
+  const text = await res.text();
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) {
+    try { return JSON.parse(text); } catch {}
+  }
+  throw new Error(text || `HTTP ${res.status}`);
+}
+
 export default function PaymentPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState('');
   const [fname, setFname] = useState('');
   const [lname, setLname] = useState('');
@@ -68,8 +94,28 @@ export default function PaymentPage() {
   const [cartErr, setCartErr] = useState<string | null>(null);
 
   const [creating, setCreating] = useState(false);
-  const [payMethod, setPayMethod] = useState<PayMethod>('stripe'); // ✅ ค่าเริ่มต้นเป็น Stripe
+  const [payMethod, setPayMethod] = useState<PayMethod>('stripe');
   const loadedRef = useRef(false);
+
+  // ซื้อเลย
+  const [buyNowItems, setBuyNowItems] = useState<BuyNowItem[] | null>(null);
+
+  // Modal ยืนยัน
+  const [showConfirm, setShowConfirm] = useState(false);
+  const confirmBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // เปิด/ปิด modal ด้วยคีย์บอร์ด
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setShowConfirm(false);
+    }
+    if (showConfirm) {
+      document.addEventListener('keydown', onKey);
+      // โฟกัสปุ่มยืนยัน
+      setTimeout(() => confirmBtnRef.current?.focus(), 0);
+    }
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showConfirm]);
 
   useEffect(() => {
     if (loadedRef.current) return;
@@ -82,12 +128,11 @@ export default function PaymentPage() {
       return;
     }
 
-    // โหลดโปรไฟล์เพื่อเติมฟอร์ม
     const loadUser = async () => {
       try {
         const res = await fetch(`/api/users`, { cache: 'no-store' });
         if (!res.ok) return;
-        const dataUnknown = (await res.json()) as unknown;
+        const dataUnknown: unknown = await res.json();
         if (Array.isArray(dataUnknown)) {
           const matched = dataUnknown.find(
             (row): row is UserProfile => isUserProfile(row) && row.id === userId
@@ -101,12 +146,21 @@ export default function PaymentPage() {
             setAddress(matched.address ?? '');
           }
         }
-      } catch (err) {
-        console.error('❌ loadUser error:', err);
-      }
+      } catch { /* ignore */ }
     };
 
-    // โหลดตะกร้า
+    const mode = searchParams.get('mode');
+
+    if (mode === 'buy-now') {
+      try {
+        const raw = sessionStorage.getItem('buy-now-items');
+        const parsed = raw ? (JSON.parse(raw) as BuyNowItem[]) : null;
+        setBuyNowItems(parsed && parsed.length > 0 ? parsed : null);
+      } catch {
+        setBuyNowItems(null);
+      }
+    }
+
     const loadCart = async () => {
       setCartLoading(true);
       setCartErr(null);
@@ -124,62 +178,93 @@ export default function PaymentPage() {
     };
 
     loadUser();
-    loadCart();
-  }, []);
+    if (mode === 'buy-now') {
+      setCartLoading(false);
+    } else {
+      loadCart();
+    }
+  }, [searchParams]);
 
-  const grandTotal = useMemo(
-    () => cart.reduce((sum, it) => sum + (Number.isFinite(it.totalPrice) ? it.totalPrice : 0), 0),
-    [cart]
-  );
+  const grandTotal = useMemo(() => {
+    if (buyNowItems && buyNowItems.length > 0) {
+      return buyNowItems.reduce((s, it) => s + (Number.isFinite(it.totalPrice) ? it.totalPrice : 0), 0);
+    }
+    return cart.reduce((sum, it) => sum + (Number.isFinite(it.totalPrice) ? it.totalPrice : 0), 0);
+  }, [buyNowItems, cart]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const isEmpty =
+    (buyNowItems && buyNowItems.length === 0) ||
+    (!buyNowItems && cart.length === 0);
+
+  // กด submit ครั้งแรก → แสดง modal (ยังไม่สร้างออเดอร์)
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (creating) return;
+    if (isEmpty) {
+      alert('ตะกร้าของคุณว่างเปล่า');
+      return;
+    }
+    setShowConfirm(true);
+  };
 
+  // ยืนยัน → สร้างออเดอร์ + ขอ Stripe + redirect
+  const proceedPayment = async () => {
     try {
       setCreating(true);
       const userId = getUserIdForFrontend();
       if (!userId) throw new Error('❌ ไม่พบ userId, กรุณา login ก่อน');
 
-      // 1️⃣ สร้างออเดอร์ก่อน
-      const res = await fetch('/api/orders', {
+      const mode = searchParams.get('mode');
+      const baseCustomer = {
+        name: `${fname} ${lname}`.trim(),
+        phone,
+        address: `${address} ${addressDetail}`.trim(),
+        email,
+      };
+
+      const baseBody = { userId, ...baseCustomer };
+      const bodyToSend =
+        mode === 'buy-now' && buyNowItems && buyNowItems.length > 0
+          ? { ...baseBody, items: buyNowItems }
+          : baseBody;
+
+      // 1) สร้างออเดอร์
+      const res1 = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          userId,
-          name: `${fname} ${lname}`.trim(),
-          phone,
-          address: `${address} ${addressDetail}`.trim(),
-          email,
-        }),
+        body: JSON.stringify(bodyToSend),
       });
+      const data1 = await (async () => { try { return await readJsonSafe(res1); } catch (err) { throw err; } })();
+      if (!res1.ok) throw new Error(data1?.error || 'สร้างคำสั่งซื้อไม่สำเร็จ');
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'สร้างคำสั่งซื้อไม่สำเร็จ');
-
-      const orderId = data?.order?.id;
+      const orderId = data1?.order?.id as string | undefined;
       if (!orderId) throw new Error('❌ ไม่พบ orderId');
 
-      // 2️⃣ ขอ Stripe Checkout Session โดยส่ง orderId ไป
-      const res2 = await fetch('/api/orders', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId }),
-      });
+      if (payMethod === 'stripe') {
+        // 2) ขอ Stripe session
+        const res2 = await fetch('/api/orders', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        });
+        const data2 = await (async () => { try { return await readJsonSafe(res2); } catch (err) { throw err; } })();
+        if (!res2.ok || !data2?.url) throw new Error(data2?.error || 'ไม่พบ URL ชำระเงิน');
 
-      const data2 = await res2.json();
-      if (!res2.ok || !data2?.url) throw new Error(data2.error || '❌ ไม่พบ URL ชำระเงิน');
+        sessionStorage.setItem('pending-order-id', orderId);
+        if (mode === 'buy-now') sessionStorage.removeItem('buy-now-items');
 
-      // 3️⃣ พา user ไป Stripe Checkout
-      window.location.href = data2.url;
+        window.location.href = data2.url;
+        return;
+      }
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      const msg = e instanceof Error ? e.message : 'เกิดข้อผิดพลาด';
+      alert(msg);
     } finally {
       setCreating(false);
+      setShowConfirm(false);
     }
   };
-
 
   return (
     <>
@@ -239,7 +324,7 @@ export default function PaymentPage() {
             required
           />
 
-          {/* ---------- NEW: วิธีชำระเงิน ---------- */}
+          {/* วิธีชำระเงิน */}
           <h3>วิธีชำระเงิน</h3>
           <label className={styles.radioRow}>
             <input
@@ -251,16 +336,6 @@ export default function PaymentPage() {
             />
             <span>บัตร/PromptPay (Stripe Checkout)</span>
           </label>
-          <label className={styles.radioRow}>
-            <input
-              type="radio"
-              name="pay-method"
-              value="manual"
-              checked={payMethod === 'manual'}
-              onChange={() => setPayMethod('manual')}
-            />
-            <span>ชำระภายหลัง (โอน/เก็บเงินปลายทาง) — สถานะจะเป็น “รอชำระเงิน”</span>
-          </label>
 
           <h3>รายการสั่งซื้อ</h3>
 
@@ -268,6 +343,31 @@ export default function PaymentPage() {
             <div style={{ marginBottom: 12 }}>กำลังโหลดตะกร้า…</div>
           ) : cartErr ? (
             <div style={{ color: '#c00', marginBottom: 12 }}>❌ {cartErr}</div>
+          ) : buyNowItems && buyNowItems.length > 0 ? (
+            <>
+              {buyNowItems.map((it, idx) => (
+                <div className={styles.orderSummary} key={`${it.productId}:${it.size}:${idx}`}>
+                  <Image
+                    src={it.image || '/placeholder.png'}
+                    alt={it.productName || 'product'}
+                    width={80}
+                    height={80}
+                  />
+                  <div>
+                    <div className={styles.productName}>{it.productName ?? '-'}</div>
+                    <div className={styles.productDetail}>Size: {it.size}</div>
+                    <div className={styles.productDetail}>
+                      ราคา/ชิ้น: {formatNumber(it.unitPrice)}฿ × {it.quantity}
+                    </div>
+                  </div>
+                  <div className={styles.price}>{formatNumber(it.totalPrice)}฿</div>
+                </div>
+              ))}
+              <div className={styles.totalRow}>
+                <span>รวมทั้งหมด</span>
+                <strong>{formatNumber(grandTotal)}฿</strong>
+              </div>
+            </>
           ) : cart.length === 0 ? (
             <div className={styles.emptyCart}>ตะกร้าของคุณว่างเปล่า</div>
           ) : (
@@ -290,7 +390,6 @@ export default function PaymentPage() {
                   <div className={styles.price}>{formatNumber(it.totalPrice)}฿</div>
                 </div>
               ))}
-
               <div className={styles.totalRow}>
                 <span>รวมทั้งหมด</span>
                 <strong>{formatNumber(grandTotal)}฿</strong>
@@ -298,13 +397,80 @@ export default function PaymentPage() {
             </>
           )}
 
-          <button type="submit" className={styles.submitBtn} disabled={creating || cart.length === 0}>
-            {creating
-              ? (payMethod === 'stripe' ? 'กำลังไปหน้าชำระเงิน…' : 'กำลังสร้างคำสั่งซื้อ…')
-              : (payMethod === 'stripe' ? 'ดำเนินการชำระเงิน' : 'สั่งซื้อ (ชำระภายหลัง)')}
+          <button
+            type="submit"
+            className={styles.submitBtn}
+            disabled={creating || Boolean((buyNowItems && buyNowItems.length === 0) || (!buyNowItems && cart.length === 0))}
+          >
+            {creating ? 'กำลังไปหน้าชำระเงิน…' : 'ดำเนินการชำระเงิน'}
           </button>
         </form>
       </div>
+
+      {/* Modal ยืนยัน (เด้งกลางจอ) */}
+      {showConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+          onClick={() => setShowConfirm(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              background: '#fff',
+              borderRadius: 12,
+              boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+              padding: 20,
+            }}
+          >
+            <h3 id="confirm-title" style={{ margin: 0, fontSize: 18 }}>ยืนยันไปหน้าชำระเงิน</h3>
+            <p style={{ margin: '12px 0 16px', color: '#444' }}>
+              ระบบจะพาคุณไปหน้า Stripe เพื่อชำระเงินตอนนี้
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                disabled={creating}
+                style={{
+                  padding: '10px 14px',
+                  border: '1px solid #bbb',
+                  borderRadius: 8,
+                  background: '#fff',
+                }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                ref={confirmBtnRef}
+                onClick={proceedPayment}
+                disabled={creating}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: '#111',
+                  color: '#fff',
+                }}
+              >
+                {creating ? 'กำลังดำเนินการ…' : 'ยืนยันชำระเงิน'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

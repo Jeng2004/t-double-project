@@ -16,7 +16,7 @@ type AllowedStatus =
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
   | 'จัดส่งสินค้าสำเร็จเเล้ว'
-  | 'กำลังจัดส่งคืนสินค้า'; // เผื่อสถานะจากฝั่งแอดมิน
+  | 'ลูกค้าคืนสินค้า'; // ✅ เพิ่ม
 
 type OrderItem = {
   id: string;
@@ -53,7 +53,6 @@ type Profile = {
   address?: string | null;
 };
 
-/** ---------- API types (no any) ---------- */
 type OrderItemApi = {
   id?: string | number;
   productId?: string | number;
@@ -61,11 +60,7 @@ type OrderItemApi = {
   size?: string;
   unitPrice?: number;
   totalPrice?: number;
-  product?: {
-    id?: string | number;
-    name?: string;
-    imageUrls?: string[];
-  } | null;
+  product?: { id?: string | number; name?: string; imageUrls?: string[] } | null;
 };
 
 type OrderApi = {
@@ -75,21 +70,13 @@ type OrderApi = {
   createdAt?: string;
   createdAtThai?: string | null;
   orderItems?: OrderItemApi[];
-  user?: {
-    id?: string;
-    email?: string | null;
-    name?: string | null;
-  } | null;
+  user?: { id?: string; email?: string | null; name?: string | null } | null;
 };
 
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 
 const formatNumber = (n: number) => {
-  try {
-    return new Intl.NumberFormat('th-TH').format(n);
-  } catch {
-    return String(n);
-  }
+  try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); }
 };
 
 const statusBadgeClass = (status: AllowedStatus) => {
@@ -102,8 +89,7 @@ const statusBadgeClass = (status: AllowedStatus) => {
       return `${styles.badge} ${styles.badgeShipping}`;
     case 'จัดส่งสินค้าสำเร็จเเล้ว':
       return `${styles.badge} ${styles.badgeSuccess}`;
-    case 'กำลังจัดส่งคืนสินค้า':
-      return `${styles.badge} ${styles.badgeShipping}`;
+    case 'ลูกค้าคืนสินค้า': // ✅ ใช้สีเดียวกับ cancel ชั่วคราว (ไม่มีคลาสเฉพาะ)
     case 'ยกเลิก':
     default:
       return `${styles.badge} ${styles.badgeCancel}`;
@@ -128,18 +114,15 @@ export default function OrderDetailsPage() {
         setLoading(true);
         setErr(null);
 
-        // 🔎 ดึงออเดอร์เฉพาะรายการนี้
         const oRes = await fetch(`/api/orders?id=${id}`, { cache: 'no-store' });
         if (!oRes.ok) throw new Error(`โหลดคำสั่งซื้อผิดพลาด: ${oRes.status}`);
         const oData: OrderApi = await oRes.json();
 
-        // ตรวจสิทธิ์เจ้าของ
         const ownerId = oData?.user?.id ?? null;
         if (!ownerId || ownerId !== userId) {
           throw new Error('ไม่พบคำสั่งซื้อของคุณหรือไม่มีสิทธิ์เข้าถึง');
         }
 
-        // map → OrderRow (type-safe)
         const items: OrderItem[] = Array.isArray(oData.orderItems)
           ? oData.orderItems.map((it): OrderItem => ({
               id: String(it.id ?? ''),
@@ -158,6 +141,7 @@ export default function OrderDetailsPage() {
             }))
           : [];
 
+        // ✅ ถ้า BE ส่ง "ลูกค้าคืนสินค้า" จะถูกคงไว้ ไม่ fallback
         const mapped: OrderRow = {
           id: String(oData.id ?? ''),
           trackingId: oData.trackingId ?? null,
@@ -170,7 +154,6 @@ export default function OrderDetailsPage() {
 
         if (!ignore) setOrder(mapped);
 
-        // โปรไฟล์ผู้ใช้
         const pres = await fetch(`/api/profile?userId=${userId}`, { cache: 'no-store' });
         if (pres.ok) {
           const pdata = await pres.json();
@@ -190,9 +173,7 @@ export default function OrderDetailsPage() {
     };
 
     load();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [id, userId]);
 
   const orderTotal = useMemo(() => {
@@ -229,7 +210,7 @@ export default function OrderDetailsPage() {
 
   const createdAtDisplay = order.createdAtThai ?? order.createdAt;
 
-  // ปุ่มเงื่อนไขตามสถานะปัจจุบัน (ตามพฤติกรรม API เดิมของคุณ)
+  // ปุ่มใช้งาน: คืนได้เฉพาะ "จัดส่งสินค้าสำเร็จเเล้ว"
   const canReturn = order.status === 'จัดส่งสินค้าสำเร็จเเล้ว';
   const canCancel = order.status === 'รอดำเนินการ';
 
@@ -243,7 +224,6 @@ export default function OrderDetailsPage() {
             หมายเลขคำสั่งซื้อ: <span className={styles.orderId}>ORD-{order.id}</span>
           </div>
 
-          {/* ข้อมูลคำสั่งซื้อ */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลคำสั่งซื้อ</h3>
             <div className={styles.infoGrid}>
@@ -258,7 +238,6 @@ export default function OrderDetailsPage() {
             </div>
           </section>
 
-          {/* สถานะ + สินค้าทั้งหมด */}
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <h3 className={styles.sectionTitle}>สถานะคำสั่งซื้อ/รายละเอียดสินค้า</h3>
@@ -283,17 +262,12 @@ export default function OrderDetailsPage() {
                 </div>
 
                 <div className={styles.itemPrice}>
-                  ฿
-                  {formatNumber(
-                    (it.totalPrice ??
-                      (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0)) || 0
-                  )}
+                  ฿{formatNumber((it.totalPrice ?? (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0)) || 0)}
                 </div>
               </div>
             ))}
           </section>
 
-          {/* การจัดส่ง */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลการจัดส่ง</h3>
             <div className={styles.infoGrid}>
@@ -302,7 +276,6 @@ export default function OrderDetailsPage() {
             </div>
           </section>
 
-          {/* ผู้รับ */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลผู้รับ</h3>
             <div className={styles.recipientCard}>
@@ -329,21 +302,14 @@ export default function OrderDetailsPage() {
             </div>
           </section>
 
-          {/* ปุ่ม */}
           <div className={styles.actions}>
-            {order.status === 'จัดส่งสินค้าสำเร็จเเล้ว' && (
-              <button
-                className={styles.btnSecondary}
-                onClick={() => router.push(`/return-the-product/${order.id}`)}
-              >
+            {canReturn && (
+              <button className={styles.btnSecondary} onClick={() => router.push(`/return-the-product/${order.id}`)}>
                 คืนสินค้า
               </button>
             )}
-            {order.status === 'รอดำเนินการ' && (
-              <button
-                className={styles.btnDanger}
-                onClick={() => router.push(`/Cancel-order/${order.id}`)}
-              >
+            {canCancel && (
+              <button className={styles.btnDanger} onClick={() => router.push(`/Cancel-order/${order.id}`)}>
                 ยกเลิกคำสั่งซื้อ
               </button>
             )}
