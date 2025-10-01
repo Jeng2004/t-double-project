@@ -1,11 +1,12 @@
+import { PrismaClient } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from '@prisma/client';
-import { PDFDocument } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import fs from 'fs';
-import path from 'path';
+import PDFDocument from "pdfkit";
+import fs from "fs";
+import path from "path";
 
-// ฟังก์ชันแปลงเวลาเป็นเวลาไทย
+const prisma = new PrismaClient();
+
+// ---------------------- ฟังก์ชันแปลงเวลาไทย ----------------------
 function formatToThaiTime(date: Date) {
   return new Date(date).toLocaleString("th-TH", {
     timeZone: "Asia/Bangkok",
@@ -13,67 +14,83 @@ function formatToThaiTime(date: Date) {
   });
 }
 
-// ฟังก์ชันสร้าง PDF สลิปจากเทมเพลต
-async function generateSlipFromTemplate(order: any): Promise<Buffer> {
-  try {
-    // โหลดเทมเพลต PDF
-    const templatePath = path.join(process.cwd(), "public", "template", "ใบเสร็จ (1).pdf");
-    const templateBytes = fs.readFileSync(templatePath);
+// ---------------------- ฟังก์ชันสร้างสลิป PDF ----------------------
+async function generateSlip(order: any): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    try {
+      const buffers: Buffer[] = [];
 
-    const pdfDoc = await PDFDocument.load(templateBytes);
+      // ใช้ฟอนต์ที่มีอยู่ในระบบ เช่น NotoSansThai-Regular.ttf
+      const fontPath = path.join(process.cwd(), "public", "fonts", "NotoSansThai-Regular.ttf");
 
-    // Register fontkit เพื่อรองรับฟอนต์ custom
-    pdfDoc.registerFontkit(fontkit);
+      if (!fs.existsSync(fontPath)) {
+        throw new Error("ไม่พบฟอนต์ NotoSansThai-Regular.ttf");
+      }
 
-    // เข้าถึงหน้าของ PDF
-    const page = pdfDoc.getPages()[0];
+      const doc = new PDFDocument({
+        size: "A4",
+        margin: 50,
+        font: fontPath,
+      });
 
-    // กำหนดฟอนต์
-    const fontPath = path.join(process.cwd(), "public", "fonts", "NotoSansThai-Regular.ttf");
-    const fontBytes = fs.readFileSync(fontPath);
-    const font = await pdfDoc.embedFont(fontBytes);
+      doc.registerFont("NotoThai", fontPath);
+      doc.font("NotoThai");
 
-    // เติมข้อมูลลงในตำแหน่งต่างๆ
-    page.drawText(`หมายเลขออเดอร์: ${order.id}`, { x: 150, y: 720, font, size: 12 });
-    page.drawText(`Tracking ID: ${order.trackingId}`, { x: 150, y: 705, font, size: 12 });
-    page.drawText(`ลูกค้า: ${order.user?.name ?? "-"}`, { x: 150, y: 690, font, size: 12 });
-    page.drawText(`อีเมล: ${order.user?.email ?? "-"}`, { x: 150, y: 675, font, size: 12 });
-    page.drawText(`วันที่: ${formatToThaiTime(order.createdAt)}`, { x: 150, y: 660, font, size: 12 });
+      doc.on("data", buffers.push.bind(buffers));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
 
-    // เติมข้อมูลรายการสินค้า
-    let yPosition = 635;
-    order.orderItems.forEach((item: any, index: number) => {
-      page.drawText(
-        `${index + 1}. ${item.product.name} (${item.size}) x ${item.quantity} - ${item.totalPrice.toLocaleString()} บาท`,
-        { x: 150, y: yPosition, font, size: 12 }
-      );
-      yPosition -= 15;
-    });
+      // Header
+      doc.fontSize(20).text("ใบเสร็จรับเงิน / Payment Slip", { align: "center" });
+      doc.moveDown(2); // เว้นระยะห่างจากหัวข้อ
 
-    // เติมยอดรวม
-    page.drawText(`ยอดรวมทั้งหมด: ${order.totalAmount.toLocaleString()} บาท`, { x: 150, y: yPosition, font, size: 14 });
+      // Order Info
+      doc.fontSize(12).text(`หมายเลขออเดอร์: ${order.id}`);
+      doc.moveDown(0.5); // เว้นระยะห่างระหว่างบรรทัด
+      doc.text(`Tracking ID: ${order.trackingId}`);
+      doc.moveDown(0.5);
+      doc.text(`ลูกค้า: ${order.user?.name ?? "-"}`);
+      doc.moveDown(0.5);
+      doc.text(`อีเมล: ${order.user?.email ?? "-"}`);
+      doc.moveDown(0.5);
+      doc.text(`วันที่: ${formatToThaiTime(order.createdAt)}`);
+      doc.moveDown(1); // เว้นระยะห่างระหว่างส่วนข้อมูลออเดอร์กับรายการสินค้า
 
-    // สร้าง Buffer ของ PDF ใหม่
-    const pdfBytes = await pdfDoc.save();
-    return Buffer.from(pdfBytes);
+      // รายการสินค้า
+      doc.fontSize(14).text("รายละเอียดสินค้า:");
+      doc.moveDown(1); // เว้นระยะห่าง
 
-  } catch (error) {
-    throw new Error(`เกิดข้อผิดพลาดในการสร้างสลิป: ${error instanceof Error ? error.message : 'ไม่ระบุข้อผิดพลาด'}`);
-  }
+      order.orderItems.forEach((item: any, index: number) => {
+        doc.fontSize(12).text(
+          `${index + 1}. ${item.product.name} (${item.size}) x ${item.quantity} - ${item.totalPrice.toLocaleString()} บาท`
+        );
+        doc.moveDown(0.5); // เว้นระยะห่างหลังแต่ละรายการ
+      });
+
+      doc.moveDown(1); // เว้นระยะห่างก่อนยอดรวม
+      doc.fontSize(14).text(`💰 ยอดรวมทั้งหมด: ${order.totalAmount.toLocaleString()} บาท`, {
+        align: "right",
+      });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
-// ฟังก์ชันที่รองรับ HTTP POST method
+// ---------------------- API สำหรับสร้างสลิป ----------------------
+
+// POST: สำหรับสร้างสลิป
 export async function POST(req: NextRequest) {
   try {
-    const { orderId } = await req.json(); // ดึงข้อมูลจาก request body
+    const body = await req.json();
+    const orderId: string = body?.orderId;
 
     if (!orderId) {
       return NextResponse.json({ error: "ต้องระบุ orderId" }, { status: 400 });
     }
 
     // ดึงข้อมูลออเดอร์จากฐานข้อมูล
-    const prisma = new PrismaClient();
-
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: { orderItems: { include: { product: true } }, user: true },
@@ -83,19 +100,65 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ไม่พบคำสั่งซื้อ" }, { status: 404 });
     }
 
-    // สร้างสลิป PDF จากเทมเพลต
-    const pdfBuffer = await generateSlipFromTemplate(order);
+    // สร้างสลิป PDF
+    const pdfBuffer = await generateSlip(order);
 
-    // ส่งสลิป PDF กลับใน response
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    // บันทึกสลิปลงฐานข้อมูล
+    const slip = await prisma.slip.create({
+      data: {
+        orderId: order.id,
+        userId: order.user?.id ?? '',
+        pdfData: pdfBuffer, // เก็บ PDF เป็น Buffer
+      },
+    });
+
+    // ส่ง PDF กลับไปใน response
+    return new NextResponse(Buffer.from(pdfBuffer), {  // แปลง Buffer เป็น Uint8Array
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename=slip-${order.id}.pdf`,
+        "Content-Disposition": `inline; filename=slip-${orderId}.pdf`,
+        "Cache-Control": "no-store",
       },
     });
   } catch (err) {
     console.error("❌ Error generating slip:", err);
     return NextResponse.json({ error: "ไม่สามารถสร้างสลิปได้" }, { status: 500 });
+  }
+}
+
+// ---------------------- API สำหรับดึงสลิป ----------------------
+
+// GET: สำหรับดึงสลิป
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const orderId = searchParams.get("orderId");
+
+    if (!orderId) {
+      return NextResponse.json({ error: "ต้องระบุ orderId" }, { status: 400 });
+    }
+
+    // ค้นหาสลิปจากฐานข้อมูล โดยใช้ `orderId`
+    const slip = await prisma.slip.findFirst({
+      where: { orderId: orderId }, // ค้นหาจาก orderId
+    });
+
+    if (!slip) {
+      return NextResponse.json({ error: "ไม่พบสลิป" }, { status: 404 });
+    }
+
+    // ส่ง PDF กลับไปใน response
+    return new NextResponse(Buffer.from(slip.pdfData), {  // แปลง pdfData เป็น Uint8Array
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename=slip-${orderId}.pdf`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error retrieving slip:", err);
+    return NextResponse.json({ error: "ไม่สามารถดึงสลิปได้" }, { status: 500 });
   }
 }
