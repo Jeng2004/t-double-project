@@ -8,10 +8,12 @@ import Link from 'next/link';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
 
+// ✅ รองรับค่าจาก API ใหม่และของเดิมเพื่อความเข้ากันได้ย้อนหลัง
 type AllowedReturnStatus =
   | 'pending'
   | 'approved'
   | 'rejected'
+  | 'cancelled'
   | 'รอดำเนินการ'
   | 'อนุมัติ'
   | 'ปฏิเสธ';
@@ -71,7 +73,7 @@ type ReturnRequestApi = {
 type ReturnRequestRow = {
   id: string;
   status: AllowedReturnStatus;
-  statusDisplay: string;
+  statusDisplay: 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ' | 'ยกเลิกคำขอ';
   reason: string | null;
   adminNote: string | null;
   createdAt: string;
@@ -92,7 +94,21 @@ const toNum = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const statusToDisplay = (s: AllowedReturnStatus | undefined): string => {
+// ✅ ฟอร์แมตเป็นเวลาประเทศไทย
+const fmtTH = (iso?: string, th?: string) => {
+  if (th && th.trim()) return th;
+  if (!iso) return '-';
+  try {
+    return new Date(iso).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false });
+  } catch {
+    return iso;
+  }
+};
+
+// ✅ map สถานะทั้งหมดให้เป็น label ภาษาไทยเดียวกัน
+const statusToDisplay = (
+  s: AllowedReturnStatus | undefined
+): ReturnRequestRow['statusDisplay'] => {
   const raw = (s ?? 'pending') as AllowedReturnStatus;
   switch (raw) {
     case 'pending':
@@ -104,16 +120,21 @@ const statusToDisplay = (s: AllowedReturnStatus | undefined): string => {
     case 'rejected':
     case 'ปฏิเสธ':
       return 'ปฏิเสธ';
+    case 'cancelled':
+      return 'ยกเลิกคำขอ';
     default:
-      return String(raw);
+      // ถ้าเจอค่านอกเหนือที่คาด ให้ถือเป็นรอดำเนินการเพื่อกัน UI พัง
+      return 'รอดำเนินการ';
   }
 };
 
+// ✅ สีป้ายให้ครบ 4 สถานะ
 const pillClass = (s: AllowedReturnStatus) => {
   const disp = statusToDisplay(s);
   if (disp === 'รอดำเนินการ') return `${styles.pill} ${styles.pillPending}`;
   if (disp === 'อนุมัติ') return `${styles.pill} ${styles.pillApproved}`;
   if (disp === 'ปฏิเสธ') return `${styles.pill} ${styles.pillRejected}`;
+  if (disp === 'ยกเลิกคำขอ') return `${styles.pill} ${styles.pillCancelled}`;
   return styles.pill;
 };
 
@@ -123,7 +144,9 @@ export default function ReturnRequestsPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const [q, setQ] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<
+    'ALL' | 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ' | 'ยกเลิกคำขอ'
+  >('ALL');
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -157,8 +180,8 @@ export default function ReturnRequestsPage() {
             statusDisplay: statusToDisplay(rr.status),
             reason: rr.reason ?? null,
             adminNote: rr.adminNote ?? null,
-            createdAt: rr.createdAt ? toStr(rr.createdAt) : '-',
-            updatedAt: rr.updatedAt ? toStr(rr.updatedAt) : '-',
+            createdAt: fmtTH(rr.createdAt, rr.createdAtThai),
+            updatedAt: fmtTH(rr.updatedAt, rr.updatedAtThai),
             order: order
               ? {
                   id: toStr(order.id),
@@ -200,6 +223,7 @@ export default function ReturnRequestsPage() {
         r.reason ?? '',
         r.adminNote ?? '',
         r.createdAt ?? '',
+        r.updatedAt ?? '',
       ]
         .join(' ')
         .toLowerCase();
@@ -236,6 +260,7 @@ export default function ReturnRequestsPage() {
               <option value="รอดำเนินการ">รอดำเนินการ</option>
               <option value="อนุมัติ">อนุมัติ</option>
               <option value="ปฏิเสธ">ปฏิเสธ</option>
+              <option value="ยกเลิกคำขอ">ยกเลิกคำขอ</option>
             </select>
           </div>
         </div>
@@ -256,7 +281,7 @@ export default function ReturnRequestsPage() {
                   <th>Items</th>
                   <th>Qty</th>
                   <th>Status</th>
-                  <th>Created</th>
+                  <th>Created / Updated</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -271,9 +296,7 @@ export default function ReturnRequestsPage() {
                   filtered.map((r) => (
                     <tr key={r.id}>
                       <td className={styles.mono}>{r.id}</td>
-                      <td>
-                        {r.order ? <span className={styles.mono}>ORD-{r.order.id}</span> : '-'}
-                      </td>
+                      <td>{r.order ? <span className={styles.mono}>ORD-{r.order.id}</span> : '-'}</td>
                       <td>
                         {r.order?.userName ?? '-'}
                         <div className={styles.subtle}>{r.order?.userEmail ?? ''}</div>
@@ -286,10 +309,9 @@ export default function ReturnRequestsPage() {
                       </td>
                       <td>
                         <div>{r.createdAt}</div>
-                        <div className={styles.subtle}>อัปเดต: {r.updatedAt}</div>
+                        <div className={styles.subtle}>{r.updatedAt}</div>
                       </td>
                       <td>
-                        {/* ✅ ปุ่มดูรายละเอียดคำขอคืนสินค้า */}
                         <Link
                           href={`/return-details/${r.id}`}
                           className={styles.link}
@@ -297,8 +319,6 @@ export default function ReturnRequestsPage() {
                         >
                           ดูคำขอ →
                         </Link>
-
-
                       </td>
                     </tr>
                   ))

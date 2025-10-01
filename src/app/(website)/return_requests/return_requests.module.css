@@ -46,6 +46,7 @@
 .pillPending  { background: #fff7e6; color: #d46b08; border-color: #ffe7ba; }
 .pillApproved { background: #f6ffed; color: #389e0d; border-color: #b7eb8f; }
 .pillRejected { background: #fff1f0; color: #cf1322; border-color: #ffa39e; }
+.pillCancelled { background: #fff2e8; color: #d4380d; border-color: #ffbb96; }
 
 /* จุกจิก */
 .subtle { font-size: 12px; color: #777; }

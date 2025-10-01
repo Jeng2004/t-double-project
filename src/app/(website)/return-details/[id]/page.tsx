@@ -1,3 +1,4 @@
+// src/app/(website)/return-details/[id]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -6,8 +7,6 @@ import Image from 'next/image';
 import styles from './return-details.module.css';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
-
-
 type ReturnStatus = 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ';
 
 type ReturnItem = {
@@ -46,7 +45,7 @@ type ReturnRequestRow = {
   } | null;
 };
 
-/* ---------- Helpers for formatting ---------- */
+/* ---------- Helpers ---------- */
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 const nf = (n: number) => { try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); } };
 const fmtTH = (d?: string) => {
@@ -65,8 +64,20 @@ const badgeClass = (s: string) => {
     default:             return `${styles.badge} ${styles.badgePending}`;
   }
 };
+const toStr = (v: unknown): string => (typeof v === 'string' ? v : String(v ?? ''));
+const toOptStr = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+const toNum = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const toStrArr = (v: unknown): string[] =>
+  Array.isArray(v) ? (v.filter((x): x is string => typeof x === 'string')) : [];
+const toSizeKey = (v: unknown): SizeKey | undefined => {
+  const s = typeof v === 'string' ? v : '';
+  return (['S','M','L','XL'] as SizeKey[]).includes(s as SizeKey) ? (s as SizeKey) : undefined;
+};
 
-/* ---------- Raw API types + safe casters ---------- */
+/* ---------- Raw API types ---------- */
 type ApiReturnItemRaw = {
   id?: unknown;
   quantity?: unknown;
@@ -84,7 +95,7 @@ type ApiReturnItemRaw = {
 
 type ApiReturnRequestRaw = {
   id?: unknown;
-  status?: unknown;
+  status?: unknown; // 'pending' | 'approved' | 'rejected' | หรือไทย
   reason?: unknown;
   images?: unknown;
   createdAt?: unknown;
@@ -102,14 +113,6 @@ type ApiReturnRequestRaw = {
     } | null;
   } | null;
 };
-
-const toStr = (v: unknown): string => (typeof v === 'string' ? v : String(v ?? ''));
-const toNum = (v: unknown): number => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-const toStrArr = (v: unknown): string[] =>
-  Array.isArray(v) ? (v.filter((x): x is string => typeof x === 'string')) : [];
 
 export default function ReturnProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -135,28 +138,59 @@ export default function ReturnProductDetailPage() {
         }
         const data = dataUnknown as ApiReturnRequestRaw;
 
-        const itemsRaw: ApiReturnItemRaw[] = Array.isArray(data.items) ? (data.items as ApiReturnItemRaw[]) : [];
+        // map status → ไทย
+        const statusTh: ReturnStatus = (() => {
+          const s = String(data.status ?? '').toLowerCase();
+          if (s === 'approved' || s === 'อนุมัติ') return 'อนุมัติ';
+          if (s === 'rejected' || s === 'ปฏิเสธ') return 'ปฏิเสธ';
+          return 'รอดำเนินการ';
+        })();
+
+        // map items
+        const items: ReturnItem[] = Array.isArray(data.items)
+          ? (data.items as ApiReturnItemRaw[]).map((it): ReturnItem => {
+              const oi = it?.orderItem ?? null;
+              const prod = oi?.product ?? null;
+              return {
+                id: toStr(it?.id),
+                quantity: toNum(it?.quantity),
+                orderItem: oi
+                  ? {
+                      id: toOptStr(oi.id) ?? undefined,
+                      size: toSizeKey(oi.size),
+                      product: prod
+                        ? {
+                            id: toOptStr(prod.id) ?? undefined,
+                            name: toOptStr(prod.name) ?? undefined,
+                            imageUrls: toStrArr(prod.imageUrls),
+                            code: typeof prod.code === 'string' ? prod.code : null,
+                          }
+                        : null,
+                    }
+                  : null,
+              };
+            })
+          : [];
 
         const mapped: ReturnRequestRow = {
-
-          id: String(data.id),
-          status: data.status === 'approved' ? 'อนุมัติ' : data.status === 'rejected' ? 'ปฏิเสธ' : 'รอดำเนินการ',
-          reason: data.reason ?? '',
-          images: Array.isArray(data.images) ? data.images : [],
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-          orderId: String(data.orderId),
-          items: Array.isArray(data.items)
-            ? data.items.map((it: any): ReturnItem => ({
-                id: String(it.id),
-                quantity: Number(it.quantity ?? 0),
-                orderItem: it.orderItem
-
+          id: toStr(data.id),
+          status: statusTh,
+          reason: toOptStr(data.reason),
+          images: toStrArr(data.images),
+          createdAt: toOptStr(data.createdAt) ?? undefined,
+          updatedAt: toOptStr(data.updatedAt) ?? undefined,
+          orderId: toStr(data.orderId),
+          items,
+          order: data.order
+            ? {
+                id: toStr(data.order.id),
+                trackingId: data.order.trackingId == null ? null : toStr(data.order.trackingId),
+                user: data.order.user
                   ? {
-                      name: typeof data.order.user.name === 'string' ? data.order.user.name : null,
-                      email: typeof data.order.user.email === 'string' ? data.order.user.email : null,
-                      phone: typeof data.order.user.phone === 'string' ? data.order.user.phone : null,
-                      address: typeof data.order.user.address === 'string' ? data.order.user.address : null,
+                      name: toOptStr(data.order.user.name),
+                      email: toOptStr(data.order.user.email),
+                      phone: toOptStr(data.order.user.phone),
+                      address: toOptStr(data.order.user.address),
                     }
                   : null,
               }
@@ -191,7 +225,6 @@ export default function ReturnProductDetailPage() {
         body: JSON.stringify({ status: apiStatus }),
       });
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || 'อัปเดตคำขอไม่สำเร็จ');
       router.back();
     } catch (e) {
@@ -362,7 +395,6 @@ export default function ReturnProductDetailPage() {
           <button className={styles.btnGhost} onClick={() => router.back()}>
             ย้อนกลับ
           </button>
-
 
           {String(reqData.status) !== 'อนุมัติ' && String(reqData.status) !== 'ปฏิเสธ' && (
             <button className={styles.btnGhostDanger} disabled={acting === 'delete'} onClick={doDelete}>

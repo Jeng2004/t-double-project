@@ -16,8 +16,8 @@ type OrderItem = {
   size: SizeKey;
   unitPrice: number | null;
   totalPrice: number | null;
-  displaySize?: string;   // ✅ ใช้แสดงไซส์จริง (เช่น 2XL หรือ custom ...)
-  notes?: string;         // ✅ เก็บหมายเหตุจาก sizeDetail
+  displaySize?: string;
+  notes?: string;
   product?: {
     id: string;
     name: string;
@@ -73,9 +73,12 @@ type OrderApi = {
   createdAtThai?: string | null;
   orderItems?: OrderItemApi[];
   user?: { id?: string; email?: string | null; name?: string | null } | null;
+  /** ✅ ใช้ตัดสินว่าไม่ควรแสดง “รอชำระเงิน” */
+  isPaid?: boolean | null;
+  /** เผื่อมีระบบส่ง paymentStatus มา เช่น 'succeeded' */
+  paymentStatus?: string | null;
 };
 
-/** ✅ ชนิดข้อมูลสำหรับคำสั่งซื้อพิเศษ (แทนการใช้ any) */
 type SpecialOrderApi = {
   id?: string | number;
   trackingId?: string | null;
@@ -90,6 +93,8 @@ type SpecialOrderApi = {
   sizeLabel?: string | null;
   user?: { id?: string; email?: string | null; name?: string | null } | null;
   paymentUrl?: string | null;
+  // เผื่ออนาคตมีบอกสถานะเงิน
+  paymentStatus?: string | null;
 };
 
 type Props = {
@@ -139,6 +144,27 @@ const toStatus = (s?: string | null): AllowedStatus => {
   }
 };
 
+/** ✅ แปลงสถานะโดยพิจารณา isPaid/paymentStatus */
+const deriveStatus = (
+  raw?: string | null,
+  opts?: { isPaid?: boolean | null; paymentStatus?: string | null }
+): AllowedStatus => {
+  let base = toStatus(raw);
+
+  const paid =
+    opts?.isPaid === true
+      ? true
+      : typeof opts?.paymentStatus === 'string'
+        ? /paid|success|succeed|succeeded/gi.test(opts!.paymentStatus!)
+        : false;
+
+  // ถ้าจ่ายแล้ว ไม่ควรอยู่ “รอชำระเงิน” → ดันขึ้นเป็น “รอดำเนินการ”
+  if (paid && base === 'รอชำระเงิน') {
+    base = 'รอดำเนินการ';
+  }
+  return base;
+};
+
 const formatNumber = (n: number) => {
   try {
     return new Intl.NumberFormat('th-TH').format(n);
@@ -171,28 +197,23 @@ const statusClass = (status: AllowedStatus): string => {
   }
 };
 
-/** small helper for narrowing */
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null;
 
 function parseSizeDetail(input?: string | null): { displaySize?: string; notes?: string } {
   const raw = String(input ?? '').trim();
   if (!raw) return {};
-
-  // แยกด้วย "|"
   const parts = raw.split('|').map((s) => s.trim());
-
-  // preset:xxx หรือ custom:xxx
   const sizePart = parts.find((p) => /^preset:/i.test(p) || /^custom:/i.test(p));
   const notesPart = parts.find((p) => /^notes:/i.test(p));
 
-  let displaySize: string | undefined = undefined;
+  let displaySize: string | undefined;
   if (sizePart) {
     const [, val] = sizePart.split(':');
-    displaySize = (val ?? '').trim() || undefined; // preset:2XL -> 2XL
+    displaySize = (val ?? '').trim() || undefined;
   }
 
-  let notes: string | undefined = undefined;
+  let notes: string | undefined;
   if (notesPart) {
     notes = notesPart.replace(/^notes:\s*/i, '').trim() || undefined;
   }
@@ -236,40 +257,45 @@ export default function TrackOrders({ orderId }: Props) {
           ? (dataNormal as OrderApi[])
           : [dataNormal as OrderApi];
 
-        const normalMapped: OrderRow[] = normalArr.map((o) => ({
-          id: String(o.id ?? ''),
-          trackingId: o.trackingId ?? null,
-          status: toStatus(o.status),
-          createdAt: String(o.createdAt ?? ''),
-          createdAtThai: o.createdAtThai ?? null,
-          orderItems: Array.isArray(o.orderItems)
-            ? o.orderItems.map((it): OrderItem => ({
-                id: String(it?.id ?? ''),
-                productId: String(it?.productId ?? ''),
-                quantity: Number(it?.quantity ?? 0),
-                size: (it?.size as SizeKey) ?? 'M',
-                unitPrice: typeof it?.unitPrice === 'number' ? it.unitPrice : null,
-                totalPrice: typeof it?.totalPrice === 'number' ? it.totalPrice : null,
-                product: it?.product
-                  ? {
-                      id: String(it.product.id ?? ''),
-                      name: String(it.product.name ?? ''),
-                      imageUrls: Array.isArray(it.product.imageUrls) ? it.product.imageUrls! : [],
-                    }
-                  : null,
-              }))
-            : [],
-          user: o.user
-            ? {
-                id: o.user.id,
-                email: o.user.email ?? undefined,
-                name: o.user.name ?? undefined,
-              }
-            : undefined,
-          source: 'normal',
-        }));
+        const normalMapped: OrderRow[] = normalArr.map((o) => {
+          const paid = o.isPaid === true;
+          const status = deriveStatus(o.status, { isPaid: paid, paymentStatus: o.paymentStatus });
 
-        // ---------- พิเศษ (Typed) ----------
+          return {
+            id: String(o.id ?? ''),
+            trackingId: o.trackingId ?? null,
+            status,
+            createdAt: String(o.createdAt ?? ''),
+            createdAtThai: o.createdAtThai ?? null,
+            orderItems: Array.isArray(o.orderItems)
+              ? o.orderItems.map((it): OrderItem => ({
+                  id: String(it?.id ?? ''),
+                  productId: String(it?.productId ?? ''),
+                  quantity: Number(it?.quantity ?? 0),
+                  size: (it?.size as SizeKey) ?? 'M',
+                  unitPrice: typeof it?.unitPrice === 'number' ? it.unitPrice : null,
+                  totalPrice: typeof it?.totalPrice === 'number' ? it.totalPrice : null,
+                  product: it?.product
+                    ? {
+                        id: String(it.product.id ?? ''),
+                        name: String(it.product.name ?? ''),
+                        imageUrls: Array.isArray(it.product.imageUrls) ? it.product.imageUrls! : [],
+                      }
+                    : null,
+                }))
+              : [],
+            user: o.user
+              ? {
+                  id: o.user.id,
+                  email: o.user.email ?? undefined,
+                  name: o.user.name ?? undefined,
+                }
+              : undefined,
+            source: 'normal',
+          };
+        });
+
+        // ---------- พิเศษ ----------
         const dataSpecialUnknown: unknown = await resSpecial.json();
 
         let specialArr: SpecialOrderApi[] = [];
@@ -283,13 +309,13 @@ export default function TrackOrders({ orderId }: Props) {
 
         const specialMapped: OrderRow[] = specialArr.map((s: SpecialOrderApi) => {
           const qty = Number(s.quantity ?? 0);
-          // ✅ ดึงไซส์จริงจาก sizeDetail (หรือ sizeLabel fallback)
           const { displaySize, notes } = parseSizeDetail(s.sizeDetail ?? s.sizeLabel ?? '');
+          const status = deriveStatus(s.status, { paymentStatus: s.paymentStatus });
 
           return {
             id: String(s.id ?? ''),
             trackingId: s.trackingId ?? null,
-            status: toStatus(s.status),
+            status,
             createdAt: String(s.createdAt ?? ''),
             createdAtThai: s.createdAtThai ?? null,
             orderItems: [
@@ -297,14 +323,13 @@ export default function TrackOrders({ orderId }: Props) {
                 id: `${s.id ?? ''}-sp-1`,
                 productId: 'special',
                 quantity: qty || 1,
-                size: 'M', // ค่าทางเทคนิค ไม่ถูกนำไปโชว์แล้ว
-                displaySize,            // ✅ ใช้โชว์แทน
-                notes,                  // ✅ เก็บหมายเหตุไว้โชว์บรรทัดถัดไป (ถ้าต้องใช้)
+                size: 'M',
+                displaySize,
+                notes,
                 unitPrice: typeof s.price === 'number' ? s.price : null,
                 totalPrice: typeof s.price === 'number' ? s.price * (qty || 1) : null,
                 product: {
                   id: 'special',
-                  // ✅ ชื่อสินค้าไม่ปะปนไซส์/โน้ต
                   name: [s.productName || 'Special Order', s.color ? `(${s.color})` : null]
                     .filter(Boolean)
                     .join(' '),
@@ -374,8 +399,8 @@ export default function TrackOrders({ orderId }: Props) {
               <Link
                 href={
                   order.source === 'special'
-                    ? `/Special-details-id/${order.id}`   // ✅ พิเศษ → หน้าใหม่
-                    : `/Order-details-id/${order.id}`     // ปกติ → หน้าเดิม
+                    ? `/Special-details-id/${order.id}`
+                    : `/Order-details-id/${order.id}`
                 }
                 className={styles.productExtraLink}
               >
@@ -394,14 +419,12 @@ export default function TrackOrders({ orderId }: Props) {
                   width={60}
                   height={60}
                 />
-
                 <div className={styles.meta}>
                   <p className={styles.productName}>{it.product?.name ?? '-'}</p>
                   <span className={styles.productDetail}>
                     Size: {it.displaySize ?? it.size} &nbsp; x{it.quantity}
                   </span>
                 </div>
-
                 <div className={styles.price}>
                   ฿
                   {formatNumber(

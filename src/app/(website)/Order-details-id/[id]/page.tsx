@@ -16,7 +16,7 @@ type AllowedStatus =
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
   | 'จัดส่งสินค้าสำเร็จเเล้ว'
-  | 'ลูกค้าคืนสินค้า'; // ✅ เพิ่ม
+  | 'ลูกค้าคืนสินค้า';
 
 type OrderItem = {
   id: string;
@@ -76,7 +76,11 @@ type OrderApi = {
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 
 const formatNumber = (n: number) => {
-  try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); }
+  try {
+    return new Intl.NumberFormat('th-TH').format(n);
+  } catch {
+    return String(n);
+  }
 };
 
 const statusBadgeClass = (status: AllowedStatus) => {
@@ -89,20 +93,36 @@ const statusBadgeClass = (status: AllowedStatus) => {
       return `${styles.badge} ${styles.badgeShipping}`;
     case 'จัดส่งสินค้าสำเร็จเเล้ว':
       return `${styles.badge} ${styles.badgeSuccess}`;
-    case 'ลูกค้าคืนสินค้า': // ✅ ใช้สีเดียวกับ cancel ชั่วคราว (ไม่มีคลาสเฉพาะ)
+    case 'ลูกค้าคืนสินค้า':
+      return `${styles.badge} ${styles.badgeReturn}`;
     case 'ยกเลิก':
     default:
       return `${styles.badge} ${styles.badgeCancel}`;
   }
 };
 
+/** สถานะที่ถือว่า "จ่ายแล้ว" และควรแสดง/สร้างสลิปจริง */
+const PAID_STATUSES: AllowedStatus[] = [
+  'รอดำเนินการ', // จ่ายแล้ว รอแอดมินตรวจ
+  'กำลังดำเนินการจัดเตรียมสินค้า',
+  'กำลังดำเนินการจัดส่งสินค้า',
+  'จัดส่งสินค้าสำเร็จเเล้ว',
+  'ลูกค้าคืนสินค้า',
+];
+
 export default function OrderDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+
   const [order, setOrder] = useState<OrderRow | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
+  // สลิป (ใช้ blob URL เพื่อเปิดแท็บใหม่ได้)
+  const [slipBlobUrl, setSlipBlobUrl] = useState<string | null>(null);
+  const [slipLoading, setSlipLoading] = useState(false);
+  const [slipErr, setSlipErr] = useState<string | null>(null);
 
   const userId = typeof window !== 'undefined' ? getUserIdForFrontend() : '';
 
@@ -114,9 +134,16 @@ export default function OrderDetailsPage() {
         setLoading(true);
         setErr(null);
 
+        // โหลดคำสั่งซื้อ
         const oRes = await fetch(`/api/orders?id=${id}`, { cache: 'no-store' });
-        if (!oRes.ok) throw new Error(`โหลดคำสั่งซื้อผิดพลาด: ${oRes.status}`);
-        const oData: OrderApi = await oRes.json();
+        const oDataUnknown: unknown = await oRes.json();
+        if (!oRes.ok) {
+          const msg =
+            (oDataUnknown as { error?: string } | null)?.error ||
+            `โหลดคำสั่งซื้อผิดพลาด: ${oRes.status}`;
+          throw new Error(msg);
+        }
+        const oData = oDataUnknown as OrderApi;
 
         const ownerId = oData?.user?.id ?? null;
         if (!ownerId || ownerId !== userId) {
@@ -141,7 +168,6 @@ export default function OrderDetailsPage() {
             }))
           : [];
 
-        // ✅ ถ้า BE ส่ง "ลูกค้าคืนสินค้า" จะถูกคงไว้ ไม่ fallback
         const mapped: OrderRow = {
           id: String(oData.id ?? ''),
           trackingId: oData.trackingId ?? null,
@@ -173,8 +199,67 @@ export default function OrderDetailsPage() {
     };
 
     load();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [id, userId]);
+
+  // โหลด/สร้างสลิปเมื่อตรงสถานะ "จ่ายแล้ว" → เก็บเป็น blob URL เพื่อเปิดแท็บใหม่ได้
+  useEffect(() => {
+    if (!order) return;
+
+    // เคลียร์ของเดิม
+    setSlipErr(null);
+    setSlipLoading(false);
+
+    if (!PAID_STATUSES.includes(order.status)) {
+      if (slipBlobUrl) URL.revokeObjectURL(slipBlobUrl);
+      setSlipBlobUrl(null);
+      return;
+    }
+
+    let canceled = false;
+    let currentBlob: string | null = null;
+
+    const loadSlip = async () => {
+      try {
+        setSlipLoading(true);
+        setSlipErr(null);
+
+        // ลอง GET
+        let r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+        if (r.status === 404) {
+          // ยังไม่มี → POST เพื่อสร้าง แล้วค่อย GET ใหม่
+          const p = await fetch('/api/slip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: order.id }),
+          });
+          if (!p.ok) throw new Error(await p.text());
+          r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+        }
+        if (!r.ok) throw new Error(await r.text());
+
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        currentBlob = url;
+
+        if (!canceled) setSlipBlobUrl(url);
+      } catch (e) {
+        if (!canceled) setSlipErr('ไม่สามารถโหลดสลิปได้');
+      } finally {
+        if (!canceled) setSlipLoading(false);
+      }
+    };
+
+    loadSlip();
+
+    return () => {
+      canceled = true;
+      if (currentBlob) URL.revokeObjectURL(currentBlob);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.status]);
 
   const orderTotal = useMemo(() => {
     if (!order) return 0;
@@ -209,10 +294,13 @@ export default function OrderDetailsPage() {
   }
 
   const createdAtDisplay = order.createdAtThai ?? order.createdAt;
-
-  // ปุ่มใช้งาน: คืนได้เฉพาะ "จัดส่งสินค้าสำเร็จเเล้ว"
   const canReturn = order.status === 'จัดส่งสินค้าสำเร็จเเล้ว';
   const canCancel = order.status === 'รอดำเนินการ';
+
+  // ฝัง blob URL แบบซ่อน UI + fit width (ถ้าบราวเซอร์รองรับกับ blob hash)
+  const slipEmbedSrc =
+    slipBlobUrl &&
+    `${slipBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH&zoom=page-width`;
 
   return (
     <>
@@ -224,6 +312,7 @@ export default function OrderDetailsPage() {
             หมายเลขคำสั่งซื้อ: <span className={styles.orderId}>ORD-{order.id}</span>
           </div>
 
+          {/* ข้อมูลคำสั่งซื้อ */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลคำสั่งซื้อ</h3>
             <div className={styles.infoGrid}>
@@ -231,13 +320,14 @@ export default function OrderDetailsPage() {
               <div className={styles.infoValue}>{createdAtDisplay}</div>
 
               <div className={styles.infoLabel}>วิธีการชำระเงิน</div>
-              <div className={styles.infoValue}>-</div>
+              <div className={styles.infoValue}>บัตร/QR</div>
 
               <div className={styles.infoLabel}>ยอดรวมทั้งหมด</div>
               <div className={styles.infoValue}>฿{formatNumber(orderTotal)}</div>
             </div>
           </section>
 
+          {/* รายการสินค้า + แสดงสถานะ */}
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <h3 className={styles.sectionTitle}>สถานะคำสั่งซื้อ/รายละเอียดสินค้า</h3>
@@ -262,12 +352,17 @@ export default function OrderDetailsPage() {
                 </div>
 
                 <div className={styles.itemPrice}>
-                  ฿{formatNumber((it.totalPrice ?? (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0)) || 0)}
+                  ฿
+                  {formatNumber(
+                    (it.totalPrice ??
+                      (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0)) || 0
+                  )}
                 </div>
               </div>
             ))}
           </section>
 
+          {/* ข้อมูลการจัดส่ง */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลการจัดส่ง</h3>
             <div className={styles.infoGrid}>
@@ -276,6 +371,7 @@ export default function OrderDetailsPage() {
             </div>
           </section>
 
+          {/* ผู้รับ */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>ข้อมูลผู้รับ</h3>
             <div className={styles.recipientCard}>
@@ -302,14 +398,81 @@ export default function OrderDetailsPage() {
             </div>
           </section>
 
+          {/* Payment Verification */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Payment Verification</h3>
+            <div className={styles.infoGrid}>
+              <div className={styles.infoLabel}>สถานะการชำระเงิน</div>
+              <div className={styles.infoValue}>
+                {PAID_STATUSES.includes(order.status) ? 'ชำระแล้ว (รอตรวจสอบ)' : 'ยังไม่ชำระ / ยกเลิก'}
+              </div>
+
+              <div className={styles.infoLabel}>ยอดชำระ</div>
+              <div className={styles.infoValue}>฿{formatNumber(orderTotal)}</div>
+            </div>
+          </section>
+
+          {/* สลิปการชำระเงิน (ย่อเหลือครึ่งหนึ่ง) */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>สลิปการชำระเงิน</h3>
+
+            {PAID_STATUSES.includes(order.status) ? (
+              slipEmbedSrc ? (
+                <div
+                  className={styles.slipWrap}
+                  role="button"
+                  title="คลิกเพื่อเปิดสลิปในแท็บใหม่ (PDF)"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (slipBlobUrl) {
+                      // เปิด blob: URL ในแท็บใหม่
+                      window.open(slipBlobUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && slipBlobUrl) {
+                      window.open(slipBlobUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                >
+                  <iframe
+                    className={styles.slipFrame}
+                    src={slipEmbedSrc}
+                    title="payment-slip"
+                    scrolling="no"
+                  />
+                  <div className={styles.slipOverlay} aria-hidden />
+                </div>
+              ) : slipLoading ? (
+                <div>กำลังโหลดสลิป…</div>
+              ) : (
+                <div className={styles.error}>{slipErr ?? 'ไม่พบสลิป'}</div>
+              )
+            ) : (
+              <div className={styles.fakeSlip}>
+                <div className={styles.fakeSlipHeader}>PAYMENT SLIP (DEMO)</div>
+                <div className={styles.fakeSlipBody}>
+                  <div>Amount: ฿{formatNumber(orderTotal)}</div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ปุ่มการทำรายการ */}
           <div className={styles.actions}>
             {canReturn && (
-              <button className={styles.btnSecondary} onClick={() => router.push(`/return-the-product/${order.id}`)}>
+              <button
+                className={styles.btnSecondary}
+                onClick={() => router.push(`/return-the-product/${order.id}`)}
+              >
                 คืนสินค้า
               </button>
             )}
             {canCancel && (
-              <button className={styles.btnDanger} onClick={() => router.push(`/Cancel-order/${order.id}`)}>
+              <button
+                className={styles.btnDanger}
+                onClick={() => router.push(`/Cancel-order/${order.id}`)}
+              >
                 ยกเลิกคำสั่งซื้อ
               </button>
             )}
