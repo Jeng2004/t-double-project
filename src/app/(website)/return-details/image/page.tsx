@@ -5,7 +5,7 @@ import Image from 'next/image';
 
 export default function ReturnImagePage() {
   const params = useSearchParams();
-  const src = params.get('src');
+  const src = params?.get('src') ?? '';
 
   if (!src) return <div style={{ padding: 40 }}>❌ ไม่พบรูป</div>;
 

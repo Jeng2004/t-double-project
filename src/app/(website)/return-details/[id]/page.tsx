@@ -115,7 +115,8 @@ type ApiReturnRequestRaw = {
 };
 
 export default function ReturnProductDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams() as { id: string } | null;
+  const id = params?.id ?? '';
   const router = useRouter();
 
   const [reqData, setReqData] = useState<ReturnRequestRow | null>(null);

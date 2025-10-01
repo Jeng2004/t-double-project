@@ -103,7 +103,7 @@ const statusBadgeClass = (status: AllowedStatus) => {
 
 /** สถานะที่ถือว่า "จ่ายแล้ว" และควรแสดง/สร้างสลิปจริง */
 const PAID_STATUSES: AllowedStatus[] = [
-  'รอดำเนินการ', // จ่ายแล้ว รอแอดมินตรวจ
+  'รอดำเนินการ',
   'กำลังดำเนินการจัดเตรียมสินค้า',
   'กำลังดำเนินการจัดส่งสินค้า',
   'จัดส่งสินค้าสำเร็จเเล้ว',
@@ -111,7 +111,10 @@ const PAID_STATUSES: AllowedStatus[] = [
 ];
 
 export default function OrderDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ เลิก destructure เพื่อตัด union | null
+  const params = useParams() as { id?: string } | null;
+  const id = params?.id ?? '';
+
   const router = useRouter();
 
   const [order, setOrder] = useState<OrderRow | null>(null);
@@ -131,11 +134,12 @@ export default function OrderDetailsPage() {
 
     const load = async () => {
       try {
+        if (!id) return;
         setLoading(true);
         setErr(null);
 
         // โหลดคำสั่งซื้อ
-        const oRes = await fetch(`/api/orders?id=${id}`, { cache: 'no-store' });
+        const oRes = await fetch(`/api/orders?id=${encodeURIComponent(id)}`, { cache: 'no-store' });
         const oDataUnknown: unknown = await oRes.json();
         if (!oRes.ok) {
           const msg =
@@ -180,7 +184,9 @@ export default function OrderDetailsPage() {
 
         if (!ignore) setOrder(mapped);
 
-        const pres = await fetch(`/api/profile?userId=${userId}`, { cache: 'no-store' });
+        const pres = await fetch(`/api/profile?userId=${encodeURIComponent(userId)}`, {
+          cache: 'no-store',
+        });
         if (pres.ok) {
           const pdata = await pres.json();
           if (!ignore)
@@ -227,7 +233,7 @@ export default function OrderDetailsPage() {
         setSlipErr(null);
 
         // ลอง GET
-        let r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+        let r = await fetch(`/api/slip?orderId=${encodeURIComponent(order.id)}`, { cache: 'no-store' });
         if (r.status === 404) {
           // ยังไม่มี → POST เพื่อสร้าง แล้วค่อย GET ใหม่
           const p = await fetch('/api/slip', {
@@ -236,7 +242,7 @@ export default function OrderDetailsPage() {
             body: JSON.stringify({ orderId: order.id }),
           });
           if (!p.ok) throw new Error(await p.text());
-          r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+          r = await fetch(`/api/slip?orderId=${encodeURIComponent(order.id)}`, { cache: 'no-store' });
         }
         if (!r.ok) throw new Error(await r.text());
 
@@ -264,7 +270,8 @@ export default function OrderDetailsPage() {
   const orderTotal = useMemo(() => {
     if (!order) return 0;
     return order.orderItems.reduce((sum, it) => {
-      const line = it.totalPrice ?? (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0);
+      const line =
+        it.totalPrice ?? (typeof it.unitPrice === 'number' ? it.unitPrice * it.quantity : 0);
       return sum + (line || 0);
     }, 0);
   }, [order]);
@@ -297,7 +304,7 @@ export default function OrderDetailsPage() {
   const canReturn = order.status === 'จัดส่งสินค้าสำเร็จเเล้ว';
   const canCancel = order.status === 'รอดำเนินการ';
 
-  // ฝัง blob URL แบบซ่อน UI + fit width (ถ้าบราวเซอร์รองรับกับ blob hash)
+  // ฝัง blob URL แบบซ่อน UI + fit width
   const slipEmbedSrc =
     slipBlobUrl &&
     `${slipBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH&zoom=page-width`;
@@ -425,7 +432,6 @@ export default function OrderDetailsPage() {
                   tabIndex={0}
                   onClick={() => {
                     if (slipBlobUrl) {
-                      // เปิด blob: URL ในแท็บใหม่
                       window.open(slipBlobUrl, '_blank', 'noopener,noreferrer');
                     }
                   }}
@@ -463,7 +469,7 @@ export default function OrderDetailsPage() {
             {canReturn && (
               <button
                 className={styles.btnSecondary}
-                onClick={() => router.push(`/return-the-product/${order.id}`)}
+                onClick={() => router.push(`/return-the-product/${encodeURIComponent(order.id)}`)}
               >
                 คืนสินค้า
               </button>
@@ -471,7 +477,7 @@ export default function OrderDetailsPage() {
             {canCancel && (
               <button
                 className={styles.btnDanger}
-                onClick={() => router.push(`/Cancel-order/${order.id}`)}
+                onClick={() => router.push(`/Cancel-order/${encodeURIComponent(order.id)}`)}
               >
                 ยกเลิกคำสั่งซื้อ
               </button>

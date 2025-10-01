@@ -18,7 +18,7 @@ type ProductDTO = {
   imageUrls?: string[];
   description?: string;
   stock?: Partial<Record<SizeKey, number | string>>;
-  category?: string | null; // ✅ เพิ่มหมวดหมู่
+  category?: string | null;
 };
 
 const toInt = (v: unknown): number => {
@@ -84,7 +84,7 @@ function Accordion({
   );
 }
 
-// ✅ helper: ตัดสินใจแสดง size guide จากหมวดหมู่
+// ✅ เลือกแสดง size guide ตามหมวดหมู่
 function pickGuides(category?: string | null): { showGuide1: boolean; showGuide2: boolean } {
   const c = (category ?? '').toLowerCase().trim();
   const isTee = c.includes('เสื้อยืด') || c.includes('t-shirt') || c.includes('tshirt') || c.includes('tee');
@@ -92,13 +92,15 @@ function pickGuides(category?: string | null): { showGuide1: boolean; showGuide2
 
   if (isTee && !isLong) return { showGuide1: true, showGuide2: false };
   if (isLong && !isTee) return { showGuide1: false, showGuide2: true };
-  // อื่น ๆ หรือไม่ระบุ → โชว์ทั้งสอง
   return { showGuide1: true, showGuide2: true };
 }
 
 export default function ProductDetailsPage() {
-  const { id } = useParams<{ id: string }>();
   const router = useRouter();
+
+  // 🔧 FIX: อ่าน params แบบปลอดภัย (กัน null)
+  const params = useParams();
+  const id: string | null = (params as { id?: string } | null)?.id ?? null;
 
   const [item, setItem] = useState<ProductDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,21 +114,31 @@ export default function ProductDetailsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
-    const load = async () => {
+    const pid = id;               // ← ผูกตัวแปรในสโคป effect
+    if (!pid) {                   // ถ้าไม่มี id ก็หยุด
+      setLoading(false);
+      setErr('ไม่พบรหัสสินค้าใน URL');
+      return;
+    }
+
+    (async () => {
       try {
-        const res = await fetch(`/api/products/${id}`, { cache: 'no-store' });
+        setLoading(true);
+        setErr(null);
+
+        const res = await fetch(`/api/products/${pid}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(await res.text());
         const data: unknown = await res.json();
 
         const picked: ProductDTO | null = Array.isArray(data)
-          ? (data.find((p: ProductDTO) => String((p as ProductDTO)?.id) === String(id)) ?? null)
+          ? (data.find((p: ProductDTO) => String((p as ProductDTO)?.id) === String(pid)) ?? null)
           : (data as ProductDTO);
 
         if (!picked) throw new Error('ไม่พบสินค้าที่ต้องการ');
         setItem(picked);
         setIdx(0);
 
+        // auto เลือกไซส์แรกที่มีสต๊อก
         const order: SizeKey[] = ['S', 'M', 'L', 'XL'];
         for (const s of order) {
           if (toInt(picked.stock?.[s]) > 0) {
@@ -139,8 +151,7 @@ export default function ProductDetailsPage() {
       } finally {
         setLoading(false);
       }
-    };
-    load();
+    })();
   }, [id]);
 
   const prev = (len: number) => setIdx((i) => (i - 1 + len) % len);
@@ -166,7 +177,7 @@ export default function ProductDetailsPage() {
   };
 
   const startPrice = getDisplayPrice(item?.price);
-  const selectedPrice = selectedSize ? getPriceForSize(item?.price, selectedSize) : null; // (เผื่อใช้ในอนาคต)
+  const selectedPrice = selectedSize ? getPriceForSize(item?.price, selectedSize) : null;
   const selectedAvailable = selectedSize ? toInt(item?.stock?.[selectedSize]) : 0;
   const isOutAll =
     toInt(item?.stock?.S) + toInt(item?.stock?.M) + toInt(item?.stock?.L) + toInt(item?.stock?.XL) <= 0;
@@ -196,7 +207,6 @@ export default function ProductDetailsPage() {
         return;
       }
 
-      // เก็บ payload โหมดซื้อเลย
       const payload = [
         {
           productId: String(item.id),
@@ -276,8 +286,6 @@ export default function ProductDetailsPage() {
   }
 
   const imgs = item.imageUrls?.length ? item.imageUrls : ['/placeholder.png'];
-
-  // ✅ ตัดสินใจว่าจะแสดง size-guide ไหนบ้าง
   const { showGuide1, showGuide2 } = pickGuides(item.category);
 
   return (
@@ -349,7 +357,7 @@ export default function ProductDetailsPage() {
                   ? (getPriceForSize(item.price, selectedSize) != null
                       ? `฿${formatTHB(getPriceForSize(item.price, selectedSize)!)}`
                       : '-')
-                  : (startPrice != null ? `฿${formatTHB(startPrice)}` : '-')}
+                  : (getDisplayPrice(item.price) != null ? `฿${formatTHB(getDisplayPrice(item.price)!)}` : '-')}
               </p>
             </div>
 
@@ -407,7 +415,7 @@ export default function ProductDetailsPage() {
 
               {/* ✅ แสดง size guide ตามหมวดหมู่ */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-                {showGuide1 && (
+                {pickGuides(item.category).showGuide1 && (
                   <Image
                     src="/size-guide.png"
                     alt="Size guide (เสื้อยืด)"
@@ -417,7 +425,7 @@ export default function ProductDetailsPage() {
                     priority
                   />
                 )}
-                {showGuide2 && (
+                {pickGuides(item.category).showGuide2 && (
                   <Image
                     src="/size-guide2.png"
                     alt="Size guide (เสื้อแขนยาว)"

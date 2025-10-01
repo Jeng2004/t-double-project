@@ -25,8 +25,8 @@ type SpecialOrder = {
   category?: string | null;
   color?: string | null;
   quantity?: number | null;
-  price?: number | null;       // ราคาต่อหน่วย (ถ้ามี)
-  sizeDetail?: string | null;  // เช่น "preset:2XL | notes:…"
+  price?: number | null;
+  sizeDetail?: string | null;
 
   user?: { name?: string | null; email?: string | null; phone?: string | null; address?: string | null } | null;
   firstName?: string | null;
@@ -46,7 +46,6 @@ const nf = (n: number) => {
   catch { return String(n); }
 };
 
-// แตก sizeDetail => sizeLabel / notes
 function parseSizeDetail(s?: string | null) {
   const raw = (s ?? '').trim();
   if (!raw) return { sizeLabel: '', notes: '' };
@@ -64,7 +63,6 @@ function parseSizeDetail(s?: string | null) {
   return { sizeLabel, notes };
 }
 
-// map สถานะจาก BE ให้เป็นหนึ่งใน allowed (กัน error 400)
 const normalizeStatus = (s?: string | null): AllowedStatus => {
   const allowed: AllowedStatus[] = [
     'ยกเลิก',
@@ -78,30 +76,34 @@ const normalizeStatus = (s?: string | null): AllowedStatus => {
 };
 
 export default function SpecialAdminDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ กัน null จาก useParams
+  const params = useParams() as (Readonly<Record<string, string>> | null);
+  const id = params?.id ?? '';
+
   const router = useRouter();
 
   const [order, setOrder] = useState<SpecialOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // ใส่ราคา & ออกลิงก์ชำระ
+  // ราคา & ชำระเงิน
   const [unitPrice, setUnitPrice] = useState<string>('');
   const [creatingPayLink, setCreatingPayLink] = useState(false);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
 
-  // อัปเดตสถานะ (ผ่าน PATCH /special-orders/[id] รองรับเฉพาะ status)
+  // อัปเดตสถานะ
   const [status, setStatus] = useState<AllowedStatus>('รอดำเนินการ');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     let ignore = false;
     const load = async () => {
+      if (!id) return;
       try {
         setLoading(true);
         setErr(null);
 
-        const res = await fetch(`/api/special-orders/${id}`, { cache: 'no-store' });
+        const res = await fetch(`/api/special-orders/${encodeURIComponent(id)}`, { cache: 'no-store' });
         const raw: unknown = await res.json();
 
         if (!res.ok) {
@@ -126,7 +128,7 @@ export default function SpecialAdminDetailPage() {
         if (!ignore) setLoading(false);
       }
     };
-    if (id) load();
+    load();
     return () => { ignore = true; };
   }, [id]);
 
@@ -134,7 +136,6 @@ export default function SpecialAdminDetailPage() {
   const qty = Number(order?.quantity || 0);
   const total = unitPrice ? Number(unitPrice || 0) * qty : 0;
 
-  // ===== 1) ใส่ราคา + สร้างลิงก์ชำระเงิน (PUT /api/special-orders) =====
   async function createPaymentLink() {
     if (!order?.id) return;
     const p = parseFloat(unitPrice);
@@ -158,7 +159,6 @@ export default function SpecialAdminDetailPage() {
         throw new Error(msg);
       }
 
-      // ดึง paymentUrl จากหลายรูปแบบผลลัพธ์
       let url: string | null = null;
       if (isRecord(raw) && typeof raw.paymentUrl === 'string') {
         url = raw.paymentUrl;
@@ -176,12 +176,11 @@ export default function SpecialAdminDetailPage() {
     }
   }
 
-  // ===== 2) อัปเดตสถานะ (PATCH /api/special-orders/[id] { status }) =====
   async function updateStatus() {
     if (!order?.id) return;
     try {
       setUpdatingStatus(true);
-      const res = await fetch(`/api/special-orders/${order.id}`, {
+      const res = await fetch(`/api/special-orders/${encodeURIComponent(String(order.id))}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -202,7 +201,6 @@ export default function SpecialAdminDetailPage() {
     }
   }
 
-  // ฟอลแบ็กข้อมูลผู้รับ (ตามที่ผู้ใช้ขอให้แสดงชุดนี้)
   const customerName =
     order?.user?.name ||
     [order?.firstName, order?.lastName].filter(Boolean).join(' ') ||
@@ -221,7 +219,6 @@ export default function SpecialAdminDetailPage() {
         <div className={styles.container}>
           <h1 className={styles.title}>จัดการออเดอร์พิเศษ (แอดมิน) – ตรวจสอบ/ใส่ราคา</h1>
 
-          {/* ข้อมูลหลัก */}
           <div className={styles.infoGrid}>
             <div>หมายเลขออเดอร์:</div>
             <div><b>ORD-{order.id}</b></div>
@@ -236,7 +233,6 @@ export default function SpecialAdminDetailPage() {
             <div>{order.trackingId || '-'}</div>
           </div>
 
-          {/* ข้อมูลลูกค้า (โชว์ใต้ Tracking ID ตามที่ขอ) */}
           <h3 className={styles.sectionTitle}>ข้อมูลลูกค้า</h3>
           <div className={styles.recipientCard}>
             <div className={styles.recRow}>
@@ -261,7 +257,6 @@ export default function SpecialAdminDetailPage() {
             </div>
           </div>
 
-          {/* รายละเอียดสินค้า + ระบุราคา */}
           <h3 className={styles.sectionTitle}>รายละเอียดสินค้า</h3>
           <div className={styles.itemRow}>
             <Image src="/special.png" alt="special" width={120} height={120} className={styles.thumb} />
@@ -300,7 +295,6 @@ export default function SpecialAdminDetailPage() {
             </div>
           </div>
 
-          {/* อัปเดตสถานะคำสั่งซื้อ (PATCH /[id]) */}
           <h3 className={styles.sectionTitle}>อัปเดตสถานะ (แอดมิน)</h3>
           <div className={styles.statusRow}>
             <select

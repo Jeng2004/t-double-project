@@ -1,3 +1,4 @@
+// src/app/(website)/success/page.tsx
 'use client';
 
 import { useEffect } from 'react';
@@ -5,14 +6,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function SuccessRedirectPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+
+  // บางโปรเจ็กต์ตั้ง strict type จนมองว่าอาจเป็น null → แคสต์ให้ยอมรับได้
+  const sp = useSearchParams() as URLSearchParams | null;
+
+  // helper ปลอดภัยต่อ null
+  const getParam = (key: string) => sp?.get(key) ?? null;
 
   useEffect(() => {
-    const orderId = searchParams.get('orderId');
+    const orderId = getParam('orderId');
     const sessionId =
-      searchParams.get('session_id') ||
-      searchParams.get('sessionId') ||
-      searchParams.get('id');
+      getParam('session_id') ||
+      getParam('sessionId') ||
+      getParam('id');
 
     if (orderId) {
       router.replace(
@@ -23,7 +29,7 @@ export default function SuccessRedirectPage() {
     } else {
       router.replace('/');
     }
-  }, [router, searchParams]);
+  }, [router, sp]); // ใส่ sp แทน searchParams
 
   // เผื่อเฟรมหนึ่งก่อน redirect
   return <div style={{ padding: 24 }}>กำลังพาไปหน้าสรุปการชำระเงิน…</div>;

@@ -82,7 +82,8 @@ const formatNumber = (n: number) => {
 const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 
 export default function ReturnTheProductPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams() as { id: string } | null;
+  const id = params?.id ?? '';
   const router = useRouter();
 
   const [order, setOrder] = useState<OrderRow | null>(null);
@@ -100,22 +101,28 @@ export default function ReturnTheProductPage() {
   // โหลดออเดอร์เฉพาะรายการนี้
   useEffect(() => {
     let ignore = false;
+
     const load = async () => {
       try {
         setLoading(true);
         setErr(null);
 
+        // ✅ กันเคสไม่มี id
+        if (!id) {
+          throw new Error('ลิงก์ไม่ถูกต้อง: ไม่พบรหัสคำสั่งซื้อ');
+        }
+
         const res = await fetch(`/api/orders?id=${id}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`โหลดคำสั่งซื้อผิดพลาด: ${res.status}`);
         const oData: OrderApi = await res.json();
 
-        // ตรวจสิทธิ์เจ้าของ
+        // ✅ ตรวจสิทธิ์เจ้าของ
         const ownerId = oData?.user?.id ?? null;
         if (!ownerId || ownerId !== userId) {
           throw new Error('ไม่พบคำสั่งซื้อของคุณหรือไม่มีสิทธิ์เข้าถึง');
         }
 
-        // map → OrderRow (type-safe)
+        // ✅ map → OrderRow (type-safe)
         const items: OrderItem[] = Array.isArray(oData.orderItems)
           ? oData.orderItems.map((it): OrderItem => ({
               id: String(it.id ?? ''),
@@ -137,9 +144,7 @@ export default function ReturnTheProductPage() {
         const mapped: OrderRow = {
           id: String(oData.id ?? ''),
           trackingId: oData.trackingId ?? null,
-          status:
-            (oData.status as AllowedStatus) ??
-            'รอดำเนินการ',
+          status: (oData.status as AllowedStatus) ?? 'รอดำเนินการ',
           createdAt: String(oData.createdAt ?? ''),
           createdAtThai: oData.createdAtThai ?? null,
           orderItems: items,
@@ -158,7 +163,9 @@ export default function ReturnTheProductPage() {
       }
     };
 
-    load();
+    // มีทั้ง id และ userId แล้วค่อยโหลด
+    if (id && userId) load();
+
     return () => {
       ignore = true;
     };

@@ -1,3 +1,4 @@
+// C:\Users\USER\t-double\src\app\(website)\Slip\[id]\page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,7 +8,10 @@ import Navbar2 from '../../components/Navbar2';
 import styles from './Slip.module.css';
 
 export default function SlipPage() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ กัน null จาก useParams และรองรับกรณี id ไม่มี
+  const params = useParams() as (Readonly<Record<string, string>> | null);
+  const id = params?.id ?? '';
+
   const router = useRouter();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,15 +21,15 @@ export default function SlipPage() {
     let objectUrl: string | null = null;
 
     const load = async () => {
-      if (!id) return;
+      if (!id) return; // ยังไม่มี id ก็รอไปก่อน
       setLoading(true);
       setErr(null);
 
       try {
         // 1) ลองดึงสลิปก่อน
-        let res = await fetch(`/api/slip?orderId=${id}`, { cache: 'no-store' });
+        let res = await fetch(`/api/slip?orderId=${encodeURIComponent(id)}`, { cache: 'no-store' });
 
-        // 2) ถ้าไม่มี ให้สั่งสร้างจาก POST แล้วลองดึงอีกครั้ง
+        // 2) ถ้าไม่มี ให้ POST สร้าง แล้วดึงใหม่
         if (!res.ok) {
           const create = await fetch('/api/slip', {
             method: 'POST',
@@ -34,7 +38,7 @@ export default function SlipPage() {
           });
           if (!create.ok) throw new Error('ไม่สามารถสร้างสลิปได้');
 
-          res = await fetch(`/api/slip?orderId=${id}`, { cache: 'no-store' });
+          res = await fetch(`/api/slip?orderId=${encodeURIComponent(id)}`, { cache: 'no-store' });
           if (!res.ok) throw new Error('ไม่สามารถดึงสลิปได้');
         }
 
@@ -62,21 +66,23 @@ export default function SlipPage() {
         <div className={styles.container}>
           <h1 className={styles.title}>สลิปการชำระเงิน</h1>
 
-          {loading ? (
+          {!id ? (
+            <div className={styles.error}>❌ ไม่พบหมายเลขคำสั่งซื้อ</div>
+          ) : loading ? (
             <div>กำลังโหลด…</div>
           ) : err ? (
             <div className={styles.error}>❌ {err}</div>
           ) : pdfUrl ? (
             <>
               <div className={styles.viewerWrap}>
-                {/* object รองรับ PDF; มี iframe เป็น fallback */}
+                {/* object รองรับ PDF; iframe เป็น fallback */}
                 <object data={pdfUrl} type="application/pdf" className={styles.viewer}>
                   <iframe src={pdfUrl} className={styles.viewer} />
                 </object>
               </div>
 
               <div className={styles.actions}>
-                <a className={styles.btnPrimary} href={pdfUrl} download={`slip-${id}.pdf`}>
+                <a className={styles.btnPrimary} href={pdfUrl} download={`slip-${id || 'unknown'}.pdf`}>
                   ดาวน์โหลด PDF
                 </a>
                 <a className={styles.btnGhost} href={pdfUrl} target="_blank" rel="noreferrer">

@@ -50,7 +50,10 @@ const formatNumber = (n: number) => {
 };
 
 export default function CancelOrderPage() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ อ่าน params แบบปลอดภัย (ไม่ destructure)
+  const params = useParams() as { id?: string | string[] } | null;
+  const id = Array.isArray(params?.id) ? params!.id[0] : (params?.id ?? '');
+
   const router = useRouter();
   const userId = typeof window !== 'undefined' ? getUserIdForFrontend() : '';
 
@@ -159,7 +162,7 @@ export default function CancelOrderPage() {
         if (!ignore) setLoading(false);
       }
     };
-    load();
+    if (id) load();
     return () => {
       ignore = true;
     };
@@ -183,7 +186,7 @@ export default function CancelOrderPage() {
       'จัดส่งสินค้าสำเร็จเเล้ว': `${styles.badge} ${styles.badgeSuccess}`,
       'ยกเลิก': `${styles.badge} ${styles.badgeCancel}`,
     };
-    return map[st];
+    return map[st] ?? `${styles.badge} ${styles.badgePending}`;
   }, [order?.status]);
 
   async function submitCancel() {
@@ -195,7 +198,7 @@ export default function CancelOrderPage() {
       setSubmitting(true);
 
       if (order.status === 'รอชำระเงิน') {
-        // ✅ ยกเลิกออเดอร์ที่ยังไม่ชำระเงิน → เปลี่ยนสถานะเป็น "ยกเลิก"
+        // ✅ ยกเลิกออเดอร์ที่ยังไม่ชำระเงิน
         const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -205,7 +208,7 @@ export default function CancelOrderPage() {
         if (!res.ok) throw new Error(t || 'ยกเลิกไม่สำเร็จ');
         alert('ยกเลิกคำสั่งซื้อเรียบร้อย');
       } else if (order.status === 'รอดำเนินการ') {
-        // ✅ เคสชำระแล้ว (รอดำเนินการ) → ใช้เอนด์พอยต์ยกเลิกพร้อมคืนเงิน
+        // ✅ เคสชำระแล้ว (รอดำเนินการ) → คืนเงินด้วย
         const res = await fetch('/api/cancel-orders', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },

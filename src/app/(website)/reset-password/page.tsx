@@ -1,3 +1,4 @@
+// src/app/(website)/reset-password/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -7,8 +8,9 @@ import styles from './reset-password.module.css';
 type Strength = 0 | 1 | 2 | 3 | 4;
 
 export default function ResetPasswordPage() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  // ✅ กันกรณี TypeScript มองว่าอาจเป็น null
+  const sp = useSearchParams();
+  const token = (sp as ReturnType<typeof useSearchParams> | null)?.get('token') ?? '';
   const router = useRouter();
 
   const [newPassword, setNewPassword] = useState('');
@@ -51,7 +53,6 @@ export default function ResetPasswordPage() {
   const match = newPassword !== '' && newPassword === confirmPassword;
 
   useEffect(() => {
-    // เคลียร์ข้อความเมื่อแก้ไขอินพุต
     setError('');
     setMessage('');
   }, [newPassword, confirmPassword]);
@@ -108,9 +109,7 @@ export default function ResetPasswordPage() {
     <div className={styles.container} onKeyDown={onKeyDown}>
       <div className={styles.card}>
         <h1 className={styles.title}>ตั้งรหัสผ่านใหม่</h1>
-        <p className={styles.subtitle}>
-          สร้างรหัสผ่านที่ปลอดภัยเพื่อเข้าสู่ระบบต่อไป
-        </p>
+        <p className={styles.subtitle}>สร้างรหัสผ่านที่ปลอดภัยเพื่อเข้าสู่ระบบต่อไป</p>
 
         {/* New password */}
         <label className={styles.label}>รหัสผ่านใหม่</label>

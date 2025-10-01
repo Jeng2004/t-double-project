@@ -1,3 +1,4 @@
+// src/app/(website)/Order-details-admin/[id]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -91,7 +92,10 @@ const PAID_STATUSES: AllowedStatus[] = [
 ];
 
 export default function OrderDetailsAdminPage() {
-  const { id } = useParams<{ id: string }>();
+  // 🔧 เลิก destructure เพื่อกัน union | null
+  const params = useParams() as { id?: string } | null;
+  const id = params?.id ?? '';
+
   const router = useRouter();
 
   const [order, setOrder] = useState<OrderRow | null>(null);
@@ -108,9 +112,10 @@ export default function OrderDetailsAdminPage() {
     let ignore = false;
     async function load() {
       try {
+        if (!id) return;
         setLoading(true);
         setErr(null);
-        const res = await fetch(`/api/orders?id=${id}`, { cache: 'no-store' });
+        const res = await fetch(`/api/orders?id=${encodeURIComponent(id)}`, { cache: 'no-store' });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || 'โหลดคำสั่งซื้อไม่สำเร็จ');
 
@@ -159,7 +164,7 @@ export default function OrderDetailsAdminPage() {
         if (!ignore) setLoading(false);
       }
     }
-    if (id) load();
+    load();
     return () => { ignore = true; };
   }, [id]);
 
@@ -185,7 +190,7 @@ export default function OrderDetailsAdminPage() {
         setSlipErr(null);
 
         // GET ก่อน
-        let r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+        let r = await fetch(`/api/slip?orderId=${encodeURIComponent(order.id)}`, { cache: 'no-store' });
         if (r.status === 404) {
           // ไม่มี → POST สร้าง แล้ว GET ใหม่
           const p = await fetch('/api/slip', {
@@ -194,7 +199,7 @@ export default function OrderDetailsAdminPage() {
             body: JSON.stringify({ orderId: order.id }),
           });
           if (!p.ok) throw new Error(await p.text());
-          r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+          r = await fetch(`/api/slip?orderId=${encodeURIComponent(order.id)}`, { cache: 'no-store' });
         }
         if (!r.ok) throw new Error(await r.text());
 
@@ -231,7 +236,7 @@ export default function OrderDetailsAdminPage() {
     if (!order) return;
     try {
       setAct(mode);
-      const res = await fetch(`/api/orders/${order.id}`, {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -354,7 +359,6 @@ export default function OrderDetailsAdminPage() {
 
             <div className={styles.sectionTitle} style={{ marginTop: 12 }}>Payment Verification</div>
 
-            {/* สลิปจริง (ถ้าชำระแล้ว) หรือ DEMO (ถ้ายัง) */}
             {PAID_STATUSES.includes(order.status) ? (
               slipEmbedSrc ? (
                 <div

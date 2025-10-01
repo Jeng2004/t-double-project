@@ -21,13 +21,11 @@ type BaseProduct = {
   updatedAt?: string;
 };
 
-// แบบหลายไซส์ (price/stock เป็น object)
 type VariantProduct = BaseProduct & {
   price: PriceBySize;
   stock: Partial<Record<SizeKey, number>>;
 };
 
-// แบบไซส์เดียว (size/price/stock เป็นค่าเดียว)
 type SingleProduct = BaseProduct & {
   size: SizeKey;
   price: number | null;
@@ -36,7 +34,6 @@ type SingleProduct = BaseProduct & {
 
 type ApiProduct = VariantProduct | SingleProduct;
 
-// response จาก API
 type SearchResponse = {
   results: ApiProduct[];
   total?: number;
@@ -52,19 +49,21 @@ const nf = (n: number) => {
   }
 };
 
-const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
+const firstImage = (arr?: string[]) =>
+  (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 
-// type guard: เช็คว่าเป็น SingleProduct (มี field "size")
+// type guard
 function isSingleProduct(p: ApiProduct): p is SingleProduct {
   return 'size' in p;
 }
 
 export default function SearchProductPage() {
   const router = useRouter();
-  const sp = useSearchParams();
 
-  const qParam = sp.get('q')?.trim() ?? '';
-  const pageParam = Math.max(1, Number(sp.get('page') ?? '1'));
+  // ✅ กัน null: แคสต์ให้เป็น nullable แล้วใช้ ?.get()
+  const params = useSearchParams() as ReturnType<typeof useSearchParams> | null;
+  const qParam = params?.get('q')?.trim() ?? '';
+  const pageParam = Math.max(1, Number(params?.get('page') ?? '1'));
   const limit = 24;
 
   const [term, setTerm] = useState(qParam);
@@ -78,6 +77,7 @@ export default function SearchProductPage() {
 
   useEffect(() => {
     let ignore = false;
+
     (async () => {
       if (!qParam) {
         setItems([]);
@@ -107,9 +107,8 @@ export default function SearchProductPage() {
         if (!ignore) setLoading(false);
       }
     })();
-    return () => {
-      ignore = true;
-    };
+
+    return () => { ignore = true; };
   }, [qParam, pageParam]);
 
   const submitSearch = () => {
@@ -141,7 +140,9 @@ export default function SearchProductPage() {
             </h1>
           ) : (
             <div className={styles.emptyWrap}>
-              <div className={styles.emptyTitle}>0 RESULTS FOUND FOR “{qParam.toUpperCase()}”</div>
+              <div className={styles.emptyTitle}>
+                0 RESULTS FOUND FOR “{qParam.toUpperCase()}”
+              </div>
               <div className={styles.emptySub}>
                 No results found for “{qParam}”. Check the spelling or use a different word or
                 phrase.

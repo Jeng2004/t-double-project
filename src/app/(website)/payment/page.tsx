@@ -82,6 +82,12 @@ export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // 👇 helper กัน searchParams เป็น null
+  const getParam = (key: string): string | null => {
+    // ใน client เสมอ แต่กันไว้เผื่อ type
+    return searchParams?.get(key) ?? null;
+  };
+
   const [email, setEmail] = useState('');
   const [fname, setFname] = useState('');
   const [lname, setLname] = useState('');
@@ -111,7 +117,6 @@ export default function PaymentPage() {
     }
     if (showConfirm) {
       document.addEventListener('keydown', onKey);
-      // โฟกัสปุ่มยืนยัน
       setTimeout(() => confirmBtnRef.current?.focus(), 0);
     }
     return () => document.removeEventListener('keydown', onKey);
@@ -149,7 +154,7 @@ export default function PaymentPage() {
       } catch { /* ignore */ }
     };
 
-    const mode = searchParams.get('mode');
+    const mode = getParam('mode');
 
     if (mode === 'buy-now') {
       try {
@@ -183,7 +188,7 @@ export default function PaymentPage() {
     } else {
       loadCart();
     }
-  }, [searchParams]);
+  }, [searchParams]); // ok ที่จะใส่ searchParams เป็น dep ใน client
 
   const grandTotal = useMemo(() => {
     if (buyNowItems && buyNowItems.length > 0) {
@@ -214,7 +219,8 @@ export default function PaymentPage() {
       const userId = getUserIdForFrontend();
       if (!userId) throw new Error('❌ ไม่พบ userId, กรุณา login ก่อน');
 
-      const mode = searchParams.get('mode');
+      const mode = getParam('mode'); // 👈 ใช้ helper เดิม
+
       const baseCustomer = {
         name: `${fname} ${lname}`.trim(),
         phone,

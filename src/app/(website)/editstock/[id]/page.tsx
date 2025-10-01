@@ -1,7 +1,7 @@
 // src/app/(website)/editstock/[id]/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import styles from './editstock.module.css';
@@ -26,7 +26,9 @@ const toNum = (v: unknown): number => {
 };
 
 export default function EditStockPage() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ หลีกเลี่ยงการ destructure จาก useParams เพื่อกันเคสที่ lib ให้เป็น union | null
+  const params = useParams() as { id?: string } | null;
+  const id = params?.id ?? ''; // ถ้าไม่มี ให้เป็น string ว่าง
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ export default function EditStockPage() {
       try {
         setLoading(true);
         setErr(null);
-        const res = await fetch(`/api/products/${id}`, { cache: 'no-store' });
+        const res = await fetch(`/api/products/${encodeURIComponent(id)}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: ProductRes = await res.json();
 
@@ -81,7 +83,7 @@ export default function EditStockPage() {
           XL: toNum(data.stock?.XL),
         };
         setStockBySize(stockObj);         // ค่าแก้ไขได้
-        setInitialStockBySize(stockObj);  // ✅ ค่าคงเหลือ(ระบบ) —ล็อกไว้จนกว่าจะบันทึก
+        setInitialStockBySize(stockObj);  // ✅ ค่าคงเหลือ(ระบบ)
       } catch (e) {
         setErr(e instanceof Error ? e.message : 'โหลดข้อมูลสินค้าไม่สำเร็จ');
       } finally {
@@ -119,12 +121,7 @@ export default function EditStockPage() {
       fd.append('stock_L', String(stockBySize.L ?? 0));
       fd.append('stock_XL', String(stockBySize.XL ?? 0));
 
-      // ถ้าต้องการแก้ category ด้วย ให้ปลดคอมเมนต์ด้านล่างและรองรับฝั่ง API
-      // if (category.trim()) {
-      //   fd.append('category', category.trim());
-      // }
-
-      const res = await fetch(`/api/products/${id}`, {
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
         method: 'PUT',
         body: fd,
         credentials: 'include',
@@ -146,7 +143,10 @@ export default function EditStockPage() {
     if (!id) return;
     if (!confirm('ลบสินค้านี้ถาวรหรือไม่?')) return;
     try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
       if (!res.ok) throw new Error(`DELETE ${res.status}`);
       alert('✅ ลบสินค้าเรียบร้อย');
       router.push('/stock-admin');
@@ -209,11 +209,9 @@ export default function EditStockPage() {
               <thead>
                 <tr>
                   <th>Size</th>
-                  {/* ❌ ลบ Product Code */}
                   <th>Price</th>
                   <th>Stock</th>
                   <th>จำนวนสต๊อกที่เหลืออยู่</th>
-                  {/* ❌ ลบคอลัมน์ “แก้ไขสินค้า” */}
                 </tr>
               </thead>
               <tbody>

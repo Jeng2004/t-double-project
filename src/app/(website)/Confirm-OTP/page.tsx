@@ -1,15 +1,17 @@
+// src/app/(website)/Confirm-OTP/page.tsx
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import styles from './Confirm-OTP.module.css';
 
 export default function ConfirmOTPPage() {
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams(); // บาง typing บอกว่าอาจเป็น null → ใช้ optional chaining ตอน get()
   const router = useRouter();
 
-  const token = searchParams.get('token') || '';
-  const emailQuery = searchParams.get('email') || '';
+  // ใช้ optional chaining ป้องกัน error ที่ว่า searchParams อาจเป็น null
+  const token = searchParams?.get('token') ?? '';
+  const emailQuery = searchParams?.get('email') ?? '';
 
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [message, setMessage] = useState('');
@@ -99,7 +101,7 @@ export default function ConfirmOTPPage() {
           {digits.map((d, i) => (
             <input
               key={i}
-              ref={(el) => { inputsRef.current[i] = el; }}  // ✅ ไม่ return ค่า -> แก้ error
+              ref={(el) => { inputsRef.current[i] = el; }}
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={1}

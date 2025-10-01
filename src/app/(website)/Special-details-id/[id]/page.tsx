@@ -66,7 +66,10 @@ function paymentStatusFromOrderStatus(status?: string | null) {
 }
 
 export default function SpecialDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ กัน null จาก useParams ให้แน่ใจว่า id เป็น string เสมอ
+  const params = useParams() as (Readonly<Record<string, string>> | null);
+  const id = params?.id ?? '';
+
   const router = useRouter();
 
   const [order, setOrder] = useState<SpecialOrder | null>(null);
@@ -87,17 +90,18 @@ export default function SpecialDetailsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
+      if (!id) return;
       try {
         setLoading(true);
         setErr(null);
 
         // รองรับทั้ง /[id] (คืน object) และ ?id= (คืน {order})
-        const byPath = await fetch(`/api/special-orders/${id}`, { cache: 'no-store' });
+        const byPath = await fetch(`/api/special-orders/${encodeURIComponent(id)}`, { cache: 'no-store' });
         if (byPath.ok) {
           const data = (await byPath.json()) as SpecialOrder;
           if (!ignore) setOrder(data);
         } else {
-          const byQuery = await fetch(`/api/special-orders?id=${id}`, { cache: 'no-store' });
+          const byQuery = await fetch(`/api/special-orders?id=${encodeURIComponent(id)}`, { cache: 'no-store' });
           const data = await byQuery.json();
           if (!byQuery.ok) throw new Error(data?.error || 'โหลดคำสั่งซื้อพิเศษไม่สำเร็จ');
           if (!ignore) setOrder((data?.order ?? data) as SpecialOrder);
@@ -108,7 +112,7 @@ export default function SpecialDetailsPage() {
         if (!ignore) setLoading(false);
       }
     };
-    if (id) load();
+    load();
     return () => { ignore = true; };
   }, [id]);
 
@@ -169,7 +173,7 @@ export default function SpecialDetailsPage() {
       setCancelMsg('✅ ยกเลิกคำสั่งซื้อและคืนเงินเรียบร้อย');
 
       // รีโหลดข้อมูลล่าสุด
-      const fresh = await fetch(`/api/special-orders/${order.id}`, { cache: 'no-store' });
+      const fresh = await fetch(`/api/special-orders/${encodeURIComponent(String(order.id))}`, { cache: 'no-store' });
       if (fresh.ok) setOrder(await fresh.json());
     } catch (e) {
       setCancelMsg(`❌ ${e instanceof Error ? e.message : 'เกิดข้อผิดพลาด'}`);
@@ -247,7 +251,7 @@ export default function SpecialDetailsPage() {
             <div className={styles.infoValue}>บัตร / QR (Stripe)</div>
 
             <div className={styles.infoLabel}>สถานะการชำระเงิน</div>
-            <div className={styles.infoValue}>{payStatus}</div>
+            <div className={styles.infoValue}>{paymentStatusFromOrderStatus(order.status)}</div>
 
             <div className={styles.infoLabel}>ยอดรวมทั้งหมด</div>
             <div className={styles.infoValue}>{total ? `฿${nf(total)}` : '-'}</div>
