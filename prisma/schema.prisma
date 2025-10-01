@@ -8,25 +8,24 @@ datasource db {
 }
 
 model User {
-  id            String        @id @default(auto()) @map("_id") @db.ObjectId
-  name          String?
-  email         String        @unique
-  password      String
-  role          String        @default("user")
-  createdAt     DateTime      @default(now())
-  username      String?       @unique
-  status        String?
-  dept          String?
-  active        Boolean       @default(false)
-  otp           String?
-  otpExpiry     DateTime?
-  cartItems     CartItem[]    @relation("UserCartItems")
-  phone         String?
-  address       String?
-  profileImage  String?
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  name         String?
+  email        String     @unique
+  password     String
+  role         String     @default("user")
+  createdAt    DateTime   @default(now())
+  username     String?    @unique
+  status       String?
+  dept         String?
+  active       Boolean    @default(false)
+  otp          String?
+  otpExpiry    DateTime?
+  cartItems    CartItem[] @relation("UserCartItems")
+  phone        String?
+  address      String?
+  profileImage String?
 
   orders        Order[]
-  // ใช้ความสัมพันธ์กับ SpecialOrder แบบไม่ตั้งชื่อ relation (ให้เข้ากับสคีมาฝั่ง main)
   specialOrders SpecialOrder[]
 }
 
@@ -35,7 +34,6 @@ model Product {
   name        String
   description String?
   category    String?
-  // เก็บราคา/สต๊อกแบบรายไซส์ เช่น {"S":100,"M":200}, {"S":10,"M":5}
   price       Json
   stock       Json
   imageUrls   String[]
@@ -61,61 +59,59 @@ model CartItem {
 }
 
 model OrderItem {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId     String   @db.ObjectId
-  order       Order    @relation(fields: [orderId], references: [id])
-  productId   String   @db.ObjectId
-  product     Product  @relation("ProductOrderItems", fields: [productId], references: [id])
-  quantity    Int
-  price       Float
-  size        String
-  unitPrice   Float
-  totalPrice  Float
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  orderId    String  @db.ObjectId
+  order      Order   @relation(fields: [orderId], references: [id])
+  productId  String  @db.ObjectId
+  product    Product @relation("ProductOrderItems", fields: [productId], references: [id])
+  quantity   Int
+  price      Float
+  size       String
+  unitPrice  Float
+  totalPrice Float
 
-  // สถานะสินค้าในออเดอร์ และจำนวนที่ถูกคืน
-  status         String  @default("ปกติ")
-  returnQuantity Int?    @default(0)
+  status         String @default("ปกติ")
+  returnQuantity Int?   @default(0)
 
-  // ความสัมพันธ์กับการคืนสินค้า (ต่อรายการ)
   returnItems ReturnItem[]
 }
 
 model Order {
-  id              String     @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String     @db.ObjectId
-  user            User       @relation(fields: [userId], references: [id])
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
 
-  totalAmount     Float
-  // ใช้สถานะค่าเริ่มต้นเป็นภาษาไทยให้ตรงกับ UI
-  status          String     @default("รอดำเนินการ")
-  cancelReason    String?
-  trackingId      String     @unique
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  createdAtThai   String?
+  totalAmount   Float
+  status        String   @default("รอดำเนินการ")
+  cancelReason  String?
+  trackingId    String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdAtThai String?
 
-  // การจ่ายเงิน (จาก main)
-  isPaid          Boolean    @default(false)
+  isPaid          Boolean @default(false)
   paymentIntentId String?
 
-  orderItems      OrderItem[]
-  returnRequests  ReturnRequest[]
+  orderItems     OrderItem[]
+  returnRequests ReturnRequest[]
+
+  slips          Slip[]   @relation("OrderSlips") // ความสัมพันธ์กับ Slip
 }
 
 model ReturnRequest {
-  id        String       @id @default(auto()) @map("_id") @db.ObjectId
-  orderId   String       @db.ObjectId
-  order     Order        @relation(fields: [orderId], references: [id])
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId String @db.ObjectId
+  order   Order  @relation(fields: [orderId], references: [id])
 
-  status    String       @default("pending") // สถานะเวิร์กโฟลว์ภายใน (pending/approved/rejected)
+  status    String   @default("pending")
   reason    String?
   adminNote String?
   images    String[]
-  category  String?      // จาก main
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  items     ReturnItem[]
+  items ReturnItem[]
 }
 
 model ReturnItem {
@@ -123,32 +119,31 @@ model ReturnItem {
   returnRequestId String        @db.ObjectId
   returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id])
 
-  orderItemId     String        @db.ObjectId
-  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
+  orderItemId String    @db.ObjectId
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
 
-  quantity        Int
+  quantity Int
 
-  // ป้องกันคืนซ้ำรายการเดิม
   @@unique([orderItemId])
 }
 
 model SpecialOrder {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  firstName       String
-  lastName        String
-  phone           String
-  email           String
-  address         String
-  category        String
-  productName     String
-  color           String?
-  quantity        Int
-  sizeDetail      String
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  firstName   String
+  lastName    String
+  phone       String
+  email       String
+  address     String
+  category    String
+  productName String
+  color       String?
+  quantity    Int
+  sizeDetail  String
 
   status          String    @default("รอดำเนินการ")
   cancelReason    String?
   createdAt       DateTime  @default(now())
-  updatedAt       DateTime? @updatedAt @default(now())
+  updatedAt       DateTime? @default(now()) @updatedAt
   createdAtThai   String?
   price           Int?
   isApproved      Boolean   @default(false)
@@ -157,23 +152,33 @@ model SpecialOrder {
   paymentIntentId String?
   refundId        String?
 
-  // ผู้ใช้ที่สั่ง (อาจเป็น guest จึงทำเป็น optional)
-  userId          String?   @db.ObjectId
-  user            User?     @relation(fields: [userId], references: [id])
+  userId String? @db.ObjectId
+  user   User?   @relation(fields: [userId], references: [id])
 
-  // คำขอคืนสินค้าสำหรับออเดอร์พิเศษ
-  returnRequests  ReturnSpecialRequest[]
+  returnRequests ReturnSpecialRequest[]
 }
 
 model ReturnSpecialRequest {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
-  specialOrderId String        @db.ObjectId
-  specialOrder   SpecialOrder  @relation(fields: [specialOrderId], references: [id])
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  specialOrderId String       @db.ObjectId
+  specialOrder   SpecialOrder @relation(fields: [specialOrderId], references: [id])
 
-  status    String    @default("รอดำเนินการ") // รอดำเนินการ, อนุมัติ, ปฏิเสธ
+  status    String   @default("รอดำเนินการ")
   reason    String?
   adminNote String?
   images    String[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// โมเดล Slip สำหรับเก็บข้อมูลสลิป PDF
+model Slip {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId // ใช้ _id เป็น Primary Key
+  orderId   String   @db.ObjectId // รหัสคำสั่งซื้อ
+  userId    String   @db.ObjectId // รหัสผู้ใช้
+  pdfData   Bytes    // เก็บ PDF เป็น Bytes (Binary Data)
+  createdAt DateTime @default(now()) // วันที่สร้างเอกสารสลิป
+
+  // ความสัมพันธ์กับ Order
+  order     Order    @relation("OrderSlips", fields: [orderId], references: [id]) // ความสัมพันธ์กับ Order
 }
