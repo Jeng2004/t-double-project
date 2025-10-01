@@ -1,4 +1,3 @@
-// src/app/(website)/Order-details-admin/[id]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -9,7 +8,6 @@ import styles from './Order-details-admin.module.css';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
 
-// ✅ เพิ่ม 'ลูกค้าคืนสินค้า'
 type AllowedStatus =
   | 'ยกเลิก'
   | 'รอดำเนินการ'
@@ -50,10 +48,14 @@ type OrderRow = {
   } | null;
 };
 
-const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
-const nf = (n: number) => { try { return new Intl.NumberFormat('th-TH').format(n); } catch { return String(n); } };
+const firstImage = (arr?: string[]) =>
+  (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
 
-// ✅ อัปเดตรายการ allowed ให้รวม 'ลูกค้าคืนสินค้า'
+const nf = (n: number) => {
+  try { return new Intl.NumberFormat('th-TH').format(n); }
+  catch { return String(n); }
+};
+
 const normalizeStatus = (s: unknown): AllowedStatus => {
   const allowed: AllowedStatus[] = [
     'ยกเลิก',
@@ -67,24 +69,26 @@ const normalizeStatus = (s: unknown): AllowedStatus => {
   return (allowed as string[]).includes(str) ? (str as AllowedStatus) : 'รอดำเนินการ';
 };
 
-// ✅ เพิ่มกรณี 'ลูกค้าคืนสินค้า' ให้มี badge ของตัวเอง
 const statusBadgeClass = (status: AllowedStatus) => {
   switch (status) {
-    case 'รอดำเนินการ':
-      return `${styles.badge} ${styles.badgePending}`;
-    case 'กำลังดำเนินการจัดเตรียมสินค้า':
-      return `${styles.badge} ${styles.badgePreparing}`;
-    case 'กำลังดำเนินการจัดส่งสินค้า':
-      return `${styles.badge} ${styles.badgeShipping}`;
-    case 'จัดส่งสินค้าสำเร็จเเล้ว':
-      return `${styles.badge} ${styles.badgeSuccess}`;
-    case 'ลูกค้าคืนสินค้า':
-      return `${styles.badge} ${styles.badgeReturn}`;
+    case 'รอดำเนินการ': return `${styles.badge} ${styles.badgePending}`;
+    case 'กำลังดำเนินการจัดเตรียมสินค้า': return `${styles.badge} ${styles.badgePreparing}`;
+    case 'กำลังดำเนินการจัดส่งสินค้า': return `${styles.badge} ${styles.badgeShipping}`;
+    case 'จัดส่งสินค้าสำเร็จเเล้ว': return `${styles.badge} ${styles.badgeSuccess}`;
+    case 'ลูกค้าคืนสินค้า': return `${styles.badge} ${styles.badgeReturn}`;
     case 'ยกเลิก':
-    default:
-      return `${styles.badge} ${styles.badgeCancel}`;
+    default: return `${styles.badge} ${styles.badgeCancel}`;
   }
 };
+
+/** สถานะที่ถือว่า "จ่ายแล้ว" และควรแสดง/สร้างสลิปจริง */
+const PAID_STATUSES: AllowedStatus[] = [
+  'รอดำเนินการ', // จ่ายแล้ว รอแอดมินตรวจ
+  'กำลังดำเนินการจัดเตรียมสินค้า',
+  'กำลังดำเนินการจัดส่งสินค้า',
+  'จัดส่งสินค้าสำเร็จเเล้ว',
+  'ลูกค้าคืนสินค้า',
+];
 
 export default function OrderDetailsAdminPage() {
   const { id } = useParams<{ id: string }>();
@@ -94,6 +98,11 @@ export default function OrderDetailsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [act, setAct] = useState<'confirm' | 'cancel' | null>(null);
+
+  // === สลิป (blob URL เพื่อเปิดแท็บใหม่ได้) ===
+  const [slipBlobUrl, setSlipBlobUrl] = useState<string | null>(null);
+  const [slipLoading, setSlipLoading] = useState(false);
+  const [slipErr, setSlipErr] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -116,14 +125,12 @@ export default function OrderDetailsAdminPage() {
                 size: String(r.size ?? 'M') as SizeKey,
                 unitPrice: typeof r.unitPrice === 'number' ? r.unitPrice : null,
                 totalPrice: typeof r.totalPrice === 'number' ? r.totalPrice : null,
-                product: p
-                  ? {
-                      id: String(p.id ?? ''),
-                      name: String(p.name ?? ''),
-                      imageUrls: Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [],
-                      code: (p.code as string | null | undefined) ?? null,
-                    }
-                  : null,
+                product: p ? {
+                  id: String(p.id ?? ''),
+                  name: String(p.name ?? ''),
+                  imageUrls: Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [],
+                  code: (p.code as string | null | undefined) ?? null,
+                } : null,
               };
             })
           : [];
@@ -136,15 +143,13 @@ export default function OrderDetailsAdminPage() {
           createdAtThai: data.createdAtThai ?? null,
           totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : null,
           orderItems: items,
-          user: data.user
-            ? {
-                id: data.user.id,
-                email: data.user.email ?? null,
-                name: data.user.name ?? null,
-                phone: data.user.phone ?? null,
-                address: data.user.address ?? null,
-              }
-            : null,
+          user: data.user ? {
+            id: data.user.id,
+            email: data.user.email ?? null,
+            name: data.user.name ?? null,
+            phone: data.user.phone ?? null,
+            address: data.user.address ?? null,
+          } : null,
         };
 
         if (!ignore) setOrder(mapped);
@@ -157,6 +162,61 @@ export default function OrderDetailsAdminPage() {
     if (id) load();
     return () => { ignore = true; };
   }, [id]);
+
+  // โหลด/สร้างสลิปถ้าสถานะเป็น “จ่ายแล้ว”
+  useEffect(() => {
+    if (!order) return;
+
+    setSlipErr(null);
+    setSlipLoading(false);
+
+    if (!PAID_STATUSES.includes(order.status)) {
+      if (slipBlobUrl) URL.revokeObjectURL(slipBlobUrl);
+      setSlipBlobUrl(null);
+      return;
+    }
+
+    let canceled = false;
+    let currentBlob: string | null = null;
+
+    const loadSlip = async () => {
+      try {
+        setSlipLoading(true);
+        setSlipErr(null);
+
+        // GET ก่อน
+        let r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+        if (r.status === 404) {
+          // ไม่มี → POST สร้าง แล้ว GET ใหม่
+          const p = await fetch('/api/slip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: order.id }),
+          });
+          if (!p.ok) throw new Error(await p.text());
+          r = await fetch(`/api/slip?orderId=${order.id}`, { cache: 'no-store' });
+        }
+        if (!r.ok) throw new Error(await r.text());
+
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        currentBlob = url;
+
+        if (!canceled) setSlipBlobUrl(url);
+      } catch (e) {
+        if (!canceled) setSlipErr('ไม่สามารถโหลดสลิปได้');
+      } finally {
+        if (!canceled) setSlipLoading(false);
+      }
+    };
+
+    loadSlip();
+    return () => {
+      canceled = true;
+      if (currentBlob) URL.revokeObjectURL(currentBlob);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.status]);
 
   const orderTotal = useMemo(() => {
     if (!order) return 0;
@@ -178,7 +238,7 @@ export default function OrderDetailsAdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'อัปเดตสถานะไม่สำเร็จ');
-      setOrder((prev) => prev ? { ...prev, status: normalizeStatus(data.order?.status ?? status) } : prev);
+      setOrder(prev => prev ? { ...prev, status: normalizeStatus(data.order?.status ?? status) } : prev);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'อัปเดตสถานะไม่สำเร็จ');
     } finally {
@@ -204,8 +264,12 @@ export default function OrderDetailsAdminPage() {
   }
 
   const paymentMethod = 'บัตร / QR (จำลอง)';
-  const paymentStatus =
-    order.status === 'รอดำเนินการ' || order.status === 'ยกเลิก' ? 'รอตรวจสอบ' : 'ชำระแล้ว';
+  const paymentStatus = PAID_STATUSES.includes(order.status) ? 'ชำระแล้ว (รอตรวจสอบ)' : 'ยังไม่ชำระ / ยกเลิก';
+
+  // สร้าง src สำหรับฝัง PDF (ซ่อน UI + fit width)
+  const slipEmbedSrc =
+    slipBlobUrl &&
+    `${slipBlobUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH&zoom=page-width`;
 
   return (
     <>
@@ -289,20 +353,46 @@ export default function OrderDetailsAdminPage() {
             </div>
 
             <div className={styles.sectionTitle} style={{ marginTop: 12 }}>Payment Verification</div>
-            <div className={styles.fakeSlip}>
-              <div className={styles.fakeSlipHeader}>PAYMENT SLIP (DEMO)</div>
-              <div className={styles.fakeSlipBody}>
-                <div>Transfer Date: 2024-01-15</div>
-                <div>Time: 10:35 AM</div>
-                <div>Bank: First National Bank</div>
-                <div>Ref No: TX-0000001</div>
-                <div>Amount: ฿{nf(orderTotal)}</div>
+
+            {/* สลิปจริง (ถ้าชำระแล้ว) หรือ DEMO (ถ้ายัง) */}
+            {PAID_STATUSES.includes(order.status) ? (
+              slipEmbedSrc ? (
+                <div
+                  className={styles.slipWrap}
+                  role="button"
+                  title="คลิกเพื่อเปิดสลิปในแท็บใหม่ (PDF)"
+                  tabIndex={0}
+                  onClick={() => { if (slipBlobUrl) window.open(slipBlobUrl, '_blank', 'noopener,noreferrer'); }}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && slipBlobUrl) {
+                      window.open(slipBlobUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                >
+                  <iframe
+                    className={styles.slipFrame}
+                    src={slipEmbedSrc}
+                    title="payment-slip"
+                    scrolling="no"
+                  />
+                  <div className={styles.slipOverlay} aria-hidden />
+                </div>
+              ) : slipLoading ? (
+                <div>กำลังโหลดสลิป…</div>
+              ) : (
+                <div className={styles.error}>{slipErr ?? 'ไม่พบสลิป'}</div>
+              )
+            ) : (
+              <div className={styles.fakeSlip}>
+                <div className={styles.fakeSlipHeader}>PAYMENT SLIP (DEMO)</div>
+                <div className={styles.fakeSlipBody}>
+                  <div>Amount: ฿{nf(orderTotal)}</div>
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           <div className={styles.actions}>
-            {/* แสดงปุ่มเฉพาะตอน 'รอดำเนินการ' เท่านั้น */}
             {order.status === 'รอดำเนินการ' && (
               <>
                 <button

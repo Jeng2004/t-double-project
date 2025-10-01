@@ -119,3 +119,40 @@
   .recRow{ grid-template-columns:1fr; }
   .actions{ flex-direction:column; }
 }
+
+/* ===== Payment Slip / PDF Viewer (narrower like user) ===== */
+.slipWrap{
+  position: relative;
+  max-width: 560px;         /* กรอบแคบลง */
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;          /* ครอปขอบ/ช่องว่างล่างของหน้า A4 */
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0,0,0,.06);
+}
+
+/* ลดความสูงเพื่อ “ครอป” ช่องว่างล่าง */
+.slipFrame{
+  width: 100%;
+  height: 352px;            /* ปรับเพิ่ม/ลดทีละ 8–12px ตามสายตา */
+  border: none;
+  display: block;
+}
+
+.slipOverlay{
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  cursor: zoom-in;          /* คลิกเพื่อเปิดเต็มแท็บใหม่ */
+}
+
+/* ถ้าอยากลดช่องว่าง section ที่มีสลิป */
+.section:has(.slipWrap){
+  margin-bottom: 12px;      /* เดิม 16px */
+}
+
+/* มือถือ: ให้ขยายเต็มจอแนวตั้งพอดี ๆ */
+@media (max-width: 720px){
+  .slipWrap{ max-width: 100%; }
+  .slipFrame{ height: 62svh; }
+}
