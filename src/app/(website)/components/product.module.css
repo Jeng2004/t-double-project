@@ -1,5 +1,5 @@
+/* --- Hover motion & shadow on the whole card --- */
 .card {
-  /* width: 300px;  ลบออกเพื่อให้กินพื้นที่เต็มคอลัมน์ของ grid */
   width: 100%;
   background-color: #f9f9f9;
   padding: 16px;
@@ -8,44 +8,80 @@
   flex-direction: column;
   gap: 12px;
   height: 100%;
+  border-radius: 10px;                 /* โค้งมนเล็กน้อยให้ดูนุ่มนวล */
+  transition: transform .25s ease,
+              box-shadow .25s ease,
+              background-color .25s ease;
+  box-shadow: 0 0 0 rgba(0,0,0,0);     /* เริ่มต้นไม่มีเงา */
 }
 
+.card:hover {
+  transform: translateY(-4px);         /* ขยับขึ้นเล็กน้อย */
+  box-shadow: 0 12px 24px rgba(0,0,0,.14);
+  background-color: #ffffff;           /* ขาวขึ้นนิดเพื่อคอนทราสต์ */
+}
+
+/* --- Image wrapper stays as square mask --- */
 .imageWrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;   /* กรอบสี่เหลี่ยมจัตุรัสเท่ากัน */
+  aspect-ratio: 1 / 1;
   background-color: #fff;
   overflow: hidden;
+  border-radius: 8px;
 }
 
-.image {
-  object-fit: contain;   /* ให้รูป “พอดีกรอบ” ไม่ครอป */
+.imageWrapper :global(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;         /* ถ้าอยากให้เต็มกรอบแบบครอป เปลี่ยนเป็น cover */
   object-position: center;
+  will-change: transform;
+  transform: translateZ(0);    /* ปลดล็อก GPU compositing */
 }
 
-.info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+/* เริ่มแอนิเมชันเมื่อ hover กรอบรูป */
+.imageWrapper:hover :global(img) {
+  animation: product-image-pan 5s ease-in-out infinite alternate;
 }
 
-.name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #222;
+/* รูปใช้ next/image แบบ fill (ตั้งแล้วใน TSX) */
+.image {
+  object-fit: contain;
+  object-position: center;
+  transition: opacity .25s ease; /* นุ่มนวลขึ้นตอนสลับรูป */
 }
 
-.sizes {
-  display: flex;
-  gap: 8px;
-  font-size: 14px;
+
+/* --- Auto pan: เลื่อนรูปอัตโนมัติเมื่อ hover ที่กรอบรูป --- */
+.imageWrapper:hover .image {
+  animation: product-image-pan 6s linear infinite alternate;
+  /* เพิ่ม scale เล็กน้อยเพื่อลดขอบขาวตอนเลื่อน */
+  transform: scale(1.03);
 }
+
+/* แอนิเมชันเลื่อนแนวตั้งนุ่ม ๆ (ปรับ % ได้ตามชอบ) */
+@keyframes product-image-pan {
+  0%   { transform: scale(1.05) translateY(0%); }
+  100% { transform: scale(1.05) translateY(-20%); }
+}
+
+/* ผู้ใช้ที่ตั้งค่า reduce motion: ปิดแอนิเมชันอัตโนมัติ */
+@media (prefers-reduced-motion: reduce) {
+  .imageWrapper:hover :global(img) {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* --- ส่วนเดิม (คงไว้) --- */
+.name { font-size: 14px; font-weight: 500; color: #222; }
+
+.info { display: flex; flex-direction: column; gap: 4px; }
+
+.sizes { display: flex; gap: 8px; font-size: 14px; }
 
 .size { color: #111; }
 .sizeOut { color: red; text-decoration: line-through; }
 
-.outOfStock {
-  font-size: 14px;
-  color: red;
-  font-weight: 500;
-}
+.outOfStock { font-size: 14px; color: red; font-weight: 500; }

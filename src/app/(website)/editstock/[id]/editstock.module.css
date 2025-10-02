@@ -114,6 +114,7 @@
   border-radius: 10px;
   font-weight: 900;
   cursor: pointer;
+  margin-left: auto; 
 }
 
 .secondaryBtn {

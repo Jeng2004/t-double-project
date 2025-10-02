@@ -70,6 +70,7 @@ export default function SweaterPage() {
                       name={p.name}
                       stock={p.stock}
                       imageUrl={imageUrl}
+                      imageUrls={p.imageUrls ?? []}
                       onClick={() => router.push(`/product/${p.id}`)}
                     />
                   );

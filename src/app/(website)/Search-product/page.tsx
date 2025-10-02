@@ -1,11 +1,10 @@
 // C:\Users\yodsa\t-double-project\src\app\(website)\Search-product\page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
-import Link from 'next/link';
 import Navbar from '../components/Navbar';
+import Product from '../components/product';
 import styles from './Search-product.module.css';
 
 type SizeKey = 'S' | 'M' | 'L' | 'XL';
@@ -29,7 +28,7 @@ type VariantProduct = BaseProduct & {
 type SingleProduct = BaseProduct & {
   size: SizeKey;
   price: number | null;
-  stock: number | null;
+  stock: number | null; // stock ของไซส์เดียว
 };
 
 type ApiProduct = VariantProduct | SingleProduct;
@@ -41,26 +40,20 @@ type SearchResponse = {
   message?: string;
 };
 
-const nf = (n: number) => {
-  try {
-    return new Intl.NumberFormat('th-TH').format(n);
-  } catch {
-    return String(n);
+const firstImage = (arr?: string[]) => (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
+const isSingleProduct = (p: ApiProduct): p is SingleProduct => 'size' in p;
+
+// แปลง stock ให้เข้ากับ <Product /> เสมอ
+function asStock(p: ApiProduct): Partial<Record<SizeKey, number>> {
+  if (isSingleProduct(p)) {
+    return { [p.size]: Number(p.stock ?? 0) } as Partial<Record<SizeKey, number>>;
   }
-};
-
-const firstImage = (arr?: string[]) =>
-  (arr && arr.length > 0 ? arr[0] : '/placeholder.png');
-
-// type guard
-function isSingleProduct(p: ApiProduct): p is SingleProduct {
-  return 'size' in p;
+  return p.stock ?? {};
 }
 
 export default function SearchProductPage() {
   const router = useRouter();
 
-  // ✅ กัน null: แคสต์ให้เป็น nullable แล้วใช้ ?.get()
   const params = useSearchParams() as ReturnType<typeof useSearchParams> | null;
   const qParam = params?.get('q')?.trim() ?? '';
   const pageParam = Math.max(1, Number(params?.get('page') ?? '1'));
@@ -73,7 +66,10 @@ export default function SearchProductPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const totalPages = Math.max(1, Math.ceil((total || count || 1) / limit));
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((total || count || 1) / limit)),
+    [total, count]
+  );
 
   useEffect(() => {
     let ignore = false;
@@ -92,7 +88,6 @@ export default function SearchProductPage() {
           `/api/products/search?name=${encodeURIComponent(qParam)}&page=${pageParam}&limit=${limit}`,
           { cache: 'no-store' }
         );
-
         const data: SearchResponse = await res.json();
         if (!res.ok) throw new Error(data?.message || 'Search failed');
 
@@ -108,7 +103,9 @@ export default function SearchProductPage() {
       }
     })();
 
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [qParam, pageParam]);
 
   const submitSearch = () => {
@@ -173,43 +170,17 @@ export default function SearchProductPage() {
             <>
               <div className={styles.grid}>
                 {items.map((p) => {
-                  const img = firstImage(p.imageUrls);
-                  const href = `/product/${p._id}`;
-
+                  const imageUrl = firstImage(p.imageUrls);
+                  const stock = asStock(p);
                   return (
-                    <Link key={p._id} href={href} className={`${styles.card} ${styles.cardLink}`}>
-                      <div className={styles.thumbWrap}>
-                        <Image
-                          src={img}
-                          alt={p.name}
-                          width={320}
-                          height={320}
-                          className={styles.thumb}
-                        />
-                      </div>
-                      <div className={styles.cardBody}>
-                        <div className={styles.name}>{p.name}</div>
-                        {p.category && <div className={styles.category}>{p.category}</div>}
-
-                        {!isSingleProduct(p) ? (
-                          <div className={styles.priceTable}>
-                            {(Object.entries(p.price ?? {}) as [SizeKey, number | undefined][])
-                              .filter(([, v]) => typeof v === 'number')
-                              .map(([k, v]) => (
-                                <div key={k} className={styles.priceRow}>
-                                  <span className={styles.sizeBadge}>{k}</span>
-                                  <span className={styles.price}>฿{nf(v as number)}</span>
-                                </div>
-                              ))}
-                          </div>
-                        ) : (
-                          <div className={styles.priceRow}>
-                            <span className={styles.sizeBadge}>{p.size}</span>
-                            <span className={styles.price}>฿{nf(p.price ?? 0)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
+                    <Product
+                      key={p._id}
+                      name={p.name}
+                      stock={stock}
+                      imageUrl={imageUrl}
+                      imageUrls={p.imageUrls ?? []} // ✅ ส่งเพื่อใช้สลับรูปตอน hover
+                      onClick={() => router.push(`/product/${p._id}`)}
+                    />
                   );
                 })}
               </div>
