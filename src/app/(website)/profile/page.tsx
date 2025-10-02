@@ -1,4 +1,3 @@
-// src/app/(website)/profile/page.tsx
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -22,6 +21,7 @@ export default function ProfilePage() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [address, setAddress] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,18 +79,27 @@ export default function ProfilePage() {
     formData.append('address', address);
 
     try {
+      setIsSaving(true);
       const res = await fetch('/api/profile', { method: 'PATCH', body: formData });
       if (!res.ok) throw new Error('อัปเดตที่อยู่ไม่สำเร็จ');
       const data = await res.json();
       setUser(data.user);
     } catch (err) {
       console.error('❌ Update address failed:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const isSaveDisabled =
+    isSaving ||
+    !address.trim() ||
+    address.trim() === (user?.address || '').trim();
 
   return (
     <>
       <Navbar />
+
       <div className={styles.container}>
         {/* โปรไฟล์ฝั่งซ้าย */}
         <div className={styles.left}>
@@ -113,25 +122,54 @@ export default function ProfilePage() {
 
             <div className={styles.nameRow}>
               <span className={styles.name}>{user?.name || 'ไม่พบชื่อผู้ใช้'}</span>
-              <span className={styles.edit} onClick={() => setShowEditProfile(true)}>
+              <span className={styles.edit} onClick={() => setShowEditProfile(true)} title="แก้ไขโปรไฟล์">
                 ✎
               </span>
             </div>
           </div>
 
+          {/* การ์ดที่อยู่ */}
           <div className={styles.addressBox}>
-            <h4>ที่อยู่</h4>
-            <div className={styles.addressImage}>
+            <div className={styles.addressHeader}>
+              <h4>ที่อยู่จัดส่ง</h4>
+              {user?.createdAt && (
+                <span className={styles.addressHint}>
+                  อัปเดตข้อมูลล่าสุด: {new Date(user.createdAt).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+
+            <div className={styles.addressField}>
+              <label htmlFor="address" className={styles.inputLabel}>
+                รายละเอียดที่อยู่
+              </label>
               <textarea
+                id="address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="เพิ่มที่อยู่ของคุณ"
+                placeholder="บ้านเลขที่, หมู่, อาคาร, ถนน, ตำบล/แขวง, อำเภอ/เขต, จังหวัด, รหัสไปรษณีย์ และเบอร์ติดต่อ"
                 className={styles.addressInput}
+                rows={5}
               />
+              <div className={styles.inputHint}>กรอกให้ครบถ้วนเพื่อจัดส่งได้รวดเร็ว</div>
             </div>
-            <button className={styles.saveAddress} onClick={handleUpdateAddress}>
-              บันทึกที่อยู่
-            </button>
+
+            <div className={styles.addressActions}>
+              <button
+                className={styles.saveAddress}
+                onClick={handleUpdateAddress}
+                disabled={isSaveDisabled}
+              >
+                {isSaving ? (
+                  <>
+                    <span className={styles.spinner} aria-hidden />
+                    กำลังบันทึก…
+                  </>
+                ) : (
+                  'บันทึกที่อยู่'
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -145,8 +183,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-
-
 
       {showEditProfile && <EditProfile onClose={() => setShowEditProfile(false)} />}
     </>
