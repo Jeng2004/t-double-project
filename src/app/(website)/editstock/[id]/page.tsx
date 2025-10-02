@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import styles from './editstock.module.css';
 import NavbarAdmin from '../../components/NavbarAdmin';
 import type { SizeKey } from '@/types/product';
+import EditStockBasic from '../../components/editstock';
 
 type PriceBySize = Record<SizeKey, number>;
 type StockBySize = Record<SizeKey, number>;
@@ -26,9 +27,9 @@ const toNum = (v: unknown): number => {
 };
 
 export default function EditStockPage() {
-  // ✅ หลีกเลี่ยงการ destructure จาก useParams เพื่อกันเคสที่ lib ให้เป็น union | null
+  // ✅ เลี่ยงการ destructure ตรง ๆ เผื่อชนเคส union | null
   const params = useParams() as { id?: string } | null;
-  const id = params?.id ?? ''; // ถ้าไม่มี ให้เป็น string ว่าง
+  const id = params?.id ?? '';
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -39,14 +40,17 @@ export default function EditStockPage() {
   const [category, setCategory] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
 
-  // ค่าแก้ไขได้
+  // ค่าแก้ไขได้ (สำหรับตาราง Variant)
   const [priceBySize, setPriceBySize] = useState<PriceBySize>({ S: 0, M: 0, L: 0, XL: 0 });
   const [stockBySize, setStockBySize] = useState<StockBySize>({ S: 0, M: 0, L: 0, XL: 0 });
 
-  // ✅ ค่าสต๊อกเดิมจากระบบ (ไว้แสดงใน “จำนวนสต๊อกที่เหลืออยู่” — ไม่เปลี่ยนตามการพิมพ์)
+  // ✅ ค่าคงเหลือจากระบบ (แสดงเป็น read-only)
   const [initialStockBySize, setInitialStockBySize] = useState<StockBySize>({
     S: 0, M: 0, L: 0, XL: 0,
   });
+
+  // 🔔 โมดัลแก้ไขข้อมูลพื้นฐาน (ชื่อ/หมวดหมู่/รูป)
+  const [showBasic, setShowBasic] = useState(false);
 
   // โหลดข้อมูลสินค้า
   useEffect(() => {
@@ -63,7 +67,7 @@ export default function EditStockPage() {
         setCategory((data.category ?? '') || '');
         setImageUrls(Array.isArray(data.imageUrls) ? data.imageUrls : []);
 
-        // ราคา รองรับทั้ง number เดี่ยวและ object รายไซส์
+        // ราคา: รองรับทั้ง number เดี่ยว และ object รายไซส์
         if (typeof data.price === 'number') {
           const p = data.price;
           setPriceBySize({ S: p, M: p, L: p, XL: p });
@@ -102,12 +106,13 @@ export default function EditStockPage() {
 
   const sizes: SizeKey[] = ['S', 'M', 'L', 'XL'];
 
+  // บันทึกเฉพาะส่วน Variant (ราคา/สต๊อก)
   const handleSave = async () => {
     if (!id) return;
     try {
       setSaving(true);
       const fd = new FormData();
-      fd.append('name', name);
+      fd.append('name', name); // ส่ง name ไปด้วยกรณี API คุณต้องการ (ไม่เปลี่ยนก็ได้)
 
       // ราคาแยกไซส์
       fd.append('price_S', String(priceBySize.S ?? 0));
@@ -115,7 +120,7 @@ export default function EditStockPage() {
       fd.append('price_L', String(priceBySize.L ?? 0));
       fd.append('price_XL', String(priceBySize.XL ?? 0));
 
-      // Stock แยกไซส์ (ค่าที่แก้ไข)
+      // สต๊อกแยกไซส์
       fd.append('stock_S', String(stockBySize.S ?? 0));
       fd.append('stock_M', String(stockBySize.M ?? 0));
       fd.append('stock_L', String(stockBySize.L ?? 0));
@@ -182,8 +187,21 @@ export default function EditStockPage() {
     <>
       <NavbarAdmin />
       <div className={styles.container}>
-        {/* หัวเรื่อง */}
-        <h1 className={styles.title}>Product Name: {name || '-'}</h1>
+        {/* หัวเรื่อง + ปุ่มเปิดโมดัลแก้ไขข้อมูลพื้นฐาน */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <h1 className={styles.title} style={{ margin: 0 }}>
+            Product Name: {name || '-'}
+          </h1>
+
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            onClick={() => setShowBasic(true)}
+            aria-label="แก้ไขข้อมูลพื้นฐาน"
+          >
+            แก้ไขข้อมูล
+          </button>
+        </div>
 
         {/* แสดง Category ถ้ามี */}
         {category.trim() && (
@@ -243,7 +261,7 @@ export default function EditStockPage() {
                       />
                     </td>
 
-                    {/* ✅ แสดงค่าคงเหลือ(ระบบ) จาก initialStockBySize — ไม่เปลี่ยนตามการพิมพ์ */}
+                    {/* ✅ แสดงค่าคงเหลือ(ระบบ) แบบคงที่ */}
                     <td className={styles.cellCenter}>{remainBySize[sz]}</td>
                   </tr>
                 ))}
@@ -267,6 +285,20 @@ export default function EditStockPage() {
           </div>
         </div>
       </div>
+
+      {/* โมดัลแก้ไขข้อมูลพื้นฐาน (ชื่อ/หมวดหมู่/รูป) */}
+      <EditStockBasic
+        id={String(id)}
+        initialName={name}
+        initialCategory={category}
+        initialImageUrls={imageUrls}
+        open={showBasic}
+        onClose={() => setShowBasic(false)}
+        onSaved={() => {
+          // รีเฟรชข้อมูลในหน้า (ถ้าใช้ Next 13+ จะมี router.refresh)
+          router.refresh?.();
+        }}
+      />
     </>
   );
 }

@@ -76,7 +76,8 @@ export default function Home() {
                     key={p.id}
                     name={p.name}
                     stock={p.stock}
-                    imageUrl={imageUrl}
+                    imageUrl={imageUrl}         // เผื่อไว้ (ไม่จำเป็นก็ได้)
+                    imageUrls={p.imageUrls ?? []}
                     onClick={() => router.push(`/product/${p.id}`)}
                   />
                 );
