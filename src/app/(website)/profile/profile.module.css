@@ -24,23 +24,22 @@
   flex: 0.6;
   display: flex;
   flex-direction: column;
-  min-height: 0;     /* สำคัญสำหรับ flex child ที่จะมีสกอร์ลภายใน */
-  /* ไม่ set overflow ที่นี่ เพื่อไม่ตัดสกอร์ลลูก */
+  min-height: 0; /* สำคัญสำหรับ flex child ที่จะมีสกอร์ลภายใน */
 }
 
+/* คำสั่งซื้อ (การ์ดขวา) */
 .ordersWrapper {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;        /* สำคัญเพื่อให้ scroll ลูกทำงาน */
+  min-height: 0; /* ให้ scroll ลูกทำงาน */
   border: 1px solid #ddd;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.05);
 }
 
-/* หัวข้อ */
 .ordersTitle {
   margin: 0;
   padding: 12px 16px;
@@ -51,7 +50,6 @@
   background: #fafafa;
 }
 
-/* กล่องที่เลื่อน */
 .ordersScroll {
   flex: 1;
   min-height: 0;
@@ -59,7 +57,7 @@
   padding: 12px 16px;
 }
 
-/* scrollbar แต่งเพิ่ม */
+/* scrollbar */
 .ordersScroll::-webkit-scrollbar {
   width: 8px;
 }
@@ -71,13 +69,13 @@
   background: #aaa;
 }
 
-/* ====== ของเดิม (คงไว้) ====== */
+/* ====== โปรไฟล์ซ้าย ====== */
 .profileHeader {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 15px;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
 }
 
 .nameRow {
@@ -91,36 +89,185 @@
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  transition: transform .12s ease, box-shadow .15s ease;
 }
 
-.name { font-weight: bold; font-size: 16px; }
-.edit { font-size: 14px; cursor: pointer; }
+.profileImage:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0,0,0,.10);
+}
+
+.name {
+  font-weight: bold;
+  font-size: 16px;
+  color: #222;
+}
+
+.edit {
+  font-size: 14px;
+  cursor: pointer;
+  color: #6366f1;
+  user-select: none;
+}
+
+/* ===== Address Card (ดีไซน์ใหม่) ===== */
 
 .addressBox {
-  border: 1px solid #ccc;
+  border: 1px solid #eaeaea;
+  background: #fff;
   padding: 20px;
-  min-height: 200px;
   width: 100%;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.04);
 }
 
-.addressBox h4 { margin-bottom: 10px; }
-
-.addressImage {
+.addressHeader {
   display: flex;
-  justify-content: center;
-  margin-top: 20px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
-.logoutButton {
-  position: fixed;
-  bottom: 20px;
-  left: 70px;
-  background-color: #e53935;
-  color: white;
+.addressBox h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #222;
+}
+
+.addressHint {
+  font-size: 12px;
+  color: #8a8a8a;
+}
+
+.addressField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inputLabel {
+  font-size: 13px;
+  color: #444;
+  font-weight: 600;
+}
+
+.addressInput {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;   /* เทาอ่อน */
+  background: #fafafa;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #111;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.addressInput::placeholder {
+  color: #9aa0a6;
+}
+
+.addressInput:focus {
+  outline: none;
+  background: #fff;
+  border-color: #6366f1;        /* indigo-500 */
+  box-shadow: 0 0 0 4px rgba(99,102,241,.15);
+}
+
+.inputHint {
+  font-size: 12px;
+  color: #6b7280;               /* gray-500 */
+}
+
+/* Actions & Button */
+.addressActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.saveAddress {
+  appearance: none;
   border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
   cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .2px;
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(79,70,229,.25);
+  transition: transform .08s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.saveAddress:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(79,70,229,.28);
+  filter: brightness(1.02);
+}
+
+.saveAddress:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 16px rgba(79,70,229,.22);
+}
+
+.saveAddress:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px rgba(79,70,229,.45);
+}
+
+.saveAddress:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+  filter: grayscale(10%);
+  box-shadow: none;
+}
+
+/* สปินเนอร์เล็ก ๆ ตอนกำลังบันทึก */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.5);
+  border-top-color: #fff;
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: -2px;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Responsive tweaks ===== */
+@media (max-width: 1024px) {
+  .container {
+    gap: 24px;
+    padding: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: initial;
+  }
+  .left, .right {
+    min-height: initial;
+  }
+  .ordersWrapper {
+    max-height: 55vh;
+  }
 }
