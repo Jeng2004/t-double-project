@@ -105,7 +105,7 @@ export default function RegisterPage() {
         {message && <p className={styles.message}>{message}</p>}
 
         <button className={styles.button} onClick={handleSubmit}>
-          SIGN UP
+          สมัครสมาชิก
         </button>
       </div>
     </div>

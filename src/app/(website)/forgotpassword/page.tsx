@@ -52,9 +52,9 @@ export default function ForgotPasswordPage() {
           onChange={(e) => setEmail(e.target.value)}
         />
 
-        <button className={styles.button} onClick={handleReset}>RESET PASSWORD</button>
+        <button className={styles.button} onClick={handleReset}>รีเซ็ตรหัสผ่าน</button>
         <button className={styles.button} onClick={() => router.push('/login')}>
-          CANCEL
+          ยกเลิก
         </button>
       </div>
     </div>

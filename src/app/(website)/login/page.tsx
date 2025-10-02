@@ -89,14 +89,14 @@ export default function LoginPage() {
           onClick={handleLogin}
           disabled={loading}
         >
-          {loading ? 'กำลังเข้าสู่ระบบ...' : 'SIGN IN'}
+          {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
         </button>
 
         <button
           className={styles.button}
           onClick={() => router.push('/forgotpassword')}
         >
-          FORGOT PASSWORD
+          ลืมรหัสผ่าน
         </button>
       </div>
 
@@ -107,7 +107,7 @@ export default function LoginPage() {
           className={styles.button}
           onClick={() => router.push('/register')}
         >
-          PROCEED TO REGISTER
+          ดำเนินการลงทะเบียน
         </button>
       </div>
     </div>
