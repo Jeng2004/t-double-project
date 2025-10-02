@@ -1,22 +1,26 @@
 .card {
-  width: 300px;
+  /* width: 300px;  ลบออกเพื่อให้กินพื้นที่เต็มคอลัมน์ของ grid */
+  width: 100%;
   background-color: #f9f9f9;
   padding: 16px;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
 }
 
 .imageWrapper {
-  width: 100%;
-  aspect-ratio: 1 / 1;
   position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;   /* กรอบสี่เหลี่ยมจัตุรัสเท่ากัน */
   background-color: #fff;
+  overflow: hidden;
 }
 
 .image {
-  object-fit: contain;
+  object-fit: contain;   /* ให้รูป “พอดีกรอบ” ไม่ครอป */
+  object-position: center;
 }
 
 .info {
@@ -37,14 +41,8 @@
   font-size: 14px;
 }
 
-.size {
-  color: #111;
-}
-
-.sizeOut {
-  color: red;
-  text-decoration: line-through;
-}
+.size { color: #111; }
+.sizeOut { color: red; text-decoration: line-through; }
 
 .outOfStock {
   font-size: 14px;
