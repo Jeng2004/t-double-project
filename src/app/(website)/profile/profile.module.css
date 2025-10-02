@@ -201,8 +201,8 @@
   font-weight: 700;
   font-size: 14px;
   letter-spacing: .2px;
-  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
-  color: #fff;
+  background: linear-gradient(180deg, #000000 0%, #000000 100%);
+  color: #ffffff;
   box-shadow: 0 6px 16px rgba(79,70,229,.25);
   transition: transform .08s ease, box-shadow .15s ease, filter .15s ease;
 }

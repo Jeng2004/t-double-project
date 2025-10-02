@@ -43,8 +43,8 @@
   .button {
     width: 100%;
     padding: 14px;
-    background-color: #ddd;
-    color: black;
+    background-color: #000000;
+    color: rgb(255, 255, 255);
     font-weight: bold;
     font-size: 14px;
     border: none;
