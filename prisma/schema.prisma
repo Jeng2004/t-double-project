@@ -32,6 +32,7 @@ model User {
 model Product {
   id          String      @id @default(auto()) @map("_id") @db.ObjectId
   name        String
+  nameLC      String      @unique          // ⬅️ ฟิลด์ใหม่ (unique, lowercase)
   description String?
   category    String?
   price       Json

@@ -456,7 +456,7 @@ export default function OrderDetailsPage() {
               )
             ) : (
               <div className={styles.fakeSlip}>
-                <div className={styles.fakeSlipHeader}>PAYMENT SLIP (DEMO)</div>
+                <div className={styles.fakeSlipHeader}>PAYMENT SLIP </div>
                 <div className={styles.fakeSlipBody}>
                   <div>Amount: ฿{formatNumber(orderTotal)}</div>
                 </div>

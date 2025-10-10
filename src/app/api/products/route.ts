@@ -58,6 +58,21 @@ async function parseFormData(req: NextRequest) {
   });
 }
 
+// 🔹 ADD: helper สำหรับ normalize path รูปภาพให้เทียบกันได้เสมอ
+function normalizeImagePath(p: string): string {
+  try {
+    // ตัด query/fragment ออก ถ้าเป็น URL เต็ม
+    const withoutQuery = p.split('?')[0].split('#')[0];
+    // ตัดโดเมน/โปรโตคอลออก ถ้าใส่มาเป็น absolute URL
+    const onlyPath = withoutQuery.replace(/^https?:\/\/[^/]+/i, '');
+    // ใช้ basename และบังคับให้เป็น lower-case
+    const base = path.basename(onlyPath);
+    return base.toLowerCase();
+  } catch {
+    return path.basename(p || '').toLowerCase();
+  }
+}
+
 // ✨ POST: เพิ่มสินค้าใหม่
 export async function POST(req: NextRequest) {
   try {
@@ -93,20 +108,90 @@ export async function POST(req: NextRequest) {
     };
 
     // ✅ จัดการไฟล์รูปภาพ
-    const imageFiles = Array.isArray(files.image)
-      ? files.image
-      : files.image
-        ? [files.image]
+    const imageFiles = Array.isArray((files as any).image)
+      ? (files as any).image
+      : (files as any).image
+        ? [(files as any).image]
         : [];
 
-    const imageUrls: string[] = imageFiles.map((file) =>
+    const imageUrls: string[] = imageFiles.map((file: any) =>
       `/uploads/${path.basename(file.filepath)}`
     );
 
-    // ✅ บันทึกสินค้าลงฐานข้อมูล
+    // 🔹 ADD: เช็กไฟล์รูปในคำขอเดียวกันว่าซ้ำกันเองหรือไม่
+    const uniqueInRequest = Array.from(new Set(imageUrls));
+    if (uniqueInRequest.length !== imageUrls.length) {
+      return NextResponse.json(
+        { error: 'รูปภาพที่อัปโหลดซ้ำกันภายในคำขอเดียวกัน' },
+        { status: 400 }
+      );
+    }
+
+    // 🔹 ADD: ทำชื่อแบบ lowercase เพื่อเช็กซ้ำแบบไม่สนตัวพิมพ์ และใช้เป็น unique key
+    const nameLC = name.toLowerCase();
+
+    // 🔹 ADD: เช็กชื่อสินค้าซ้ำด้วย nameLC (ต้องเพิ่มฟิลด์ nameLC @unique ใน schema ตามที่แจ้ง)
+    const existingByName = await prisma.product.findUnique({
+      where: { nameLC },            // ใช้ index unique ที่เสถียรบน MongoDB
+      select: { id: true, name: true }
+    }).catch(async () => {
+      // fallback (กรณีเพิ่งเพิ่ม schema แต่ db ยังไม่ push): ใช้ findFirst insensitive ชั่วคราว
+      return prisma.product.findFirst({
+        where: { name: { equals: name, mode: 'insensitive' } },
+        select: { id: true, name: true }
+      });
+    });
+
+    if (existingByName) {
+      return NextResponse.json(
+        { error: 'ชื่อสินค้านี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น' },
+        { status: 409 }
+      );
+    }
+
+    // 🔹 ADD: เช็กรูปซ้ำกับสินค้าเดิมในฐานข้อมูล (ถ้ามีการอัปโหลดรูป)
+    if (imageUrls.length > 0) {
+      // 1) ดึงสินค้าที่ "มีภาพชุดนี้ซ้ำบางส่วน" ด้วย hasSome (เร็ว)
+      const candidates = await prisma.product.findMany({
+        where: { imageUrls: { hasSome: imageUrls } },
+        select: { id: true, name: true, imageUrls: true }
+      });
+
+      if (candidates.length > 0) {
+        // 2) ตรวจซ้ำแบบ normalize ชื่อไฟล์อีกชั้น (แม่นยำกว่า)
+        const normalizedRequestImages = new Set(imageUrls.map(normalizeImagePath));
+
+        // รวมทุกรายการที่มี overlap จริง ๆ
+        const conflicts = candidates
+          .map(p => {
+            const overlap = p.imageUrls
+              .map(normalizeImagePath)
+              .filter(img => normalizedRequestImages.has(img));
+            return { id: p.id, name: p.name, overlap };
+          })
+          .filter(x => x.overlap.length > 0);
+
+        if (conflicts.length > 0) {
+          return NextResponse.json(
+            {
+              error: 'พบรูปภาพซ้ำกับสินค้าที่มีอยู่แล้ว ไม่สามารถสร้างสินค้าได้',
+              conflicts: conflicts.map(c => ({
+                id: c.id,
+                name: c.name,
+                duplicateImages: c.overlap
+              }))
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
+    // ✅ บันทึกสินค้าลงฐานข้อมูล (🔹 ADD: nameLC)
     const product = await prisma.product.create({
       data: {
         name,
+        nameLC,                 // ⬅️ บันทึกชื่อแบบ lowercase
         description,
         category, // ✅ บันทึก category ลง DB
         stock,

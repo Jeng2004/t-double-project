@@ -15,30 +15,40 @@ export default function Home() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
+    const check = async () => {
       try {
-        const res = await fetch('/api/products', { cache: 'no-store' });
-        if (!res.ok) throw new Error(await res.text());
-        const data: DBProduct[] = await res.json();
-        setItems(data);
-      } catch (e: unknown) {
-        if (e instanceof Error) {
-          setErr(e.message);
-        } else {
-          setErr('โหลดสินค้าล้มเหลว');
+        // ✅ ใส่ credentials:'include' เพื่อให้ cookie ถูกส่งแน่ๆ
+        const res = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' });
+        if (!res.ok) {
+          router.replace('/login');
+          return;
         }
-      } finally {
-        setLoading(false);
+
+        // ล็อกอินแล้ว → โหลดสินค้า
+        const load = async () => {
+          try {
+            const r = await fetch('/api/products', { cache: 'no-store', credentials: 'include' });
+            if (!r.ok) throw new Error(await r.text());
+            const data: DBProduct[] = await r.json();
+            setItems(data);
+          } catch (e: unknown) {
+            setErr(e instanceof Error ? e.message : 'โหลดสินค้าล้มเหลว');
+          } finally {
+            setLoading(false);
+          }
+        };
+        load();
+      } catch {
+        router.replace('/login');
       }
     };
-    load();
-  }, []);
+    check();
+  }, [router]);
 
   return (
     <>
       <Navbar />
 
-      {/* Banner 1.png */}
       <div className="mb-10">
         <Image
           src="/1.png"
@@ -50,7 +60,6 @@ export default function Home() {
         />
       </div>
 
-      {/* สินค้าใหม่ */}
       <div className="p-10">
         <h2 className="text-xl font-semibold mb-6">สินค้าใหม่</h2>
 
@@ -64,19 +73,14 @@ export default function Home() {
             ) : (
               items.map((p) => {
                 const imageUrl = p.imageUrls?.[0] || '/placeholder.png';
-                const totalStock =
-                  (p.stock?.S ?? 0) +
-                  (p.stock?.M ?? 0) +
-                  (p.stock?.L ?? 0) +
-                  (p.stock?.XL ?? 0);
-                const isOut = totalStock <= 0;
-
                 return (
                   <Product
                     key={p.id}
                     name={p.name}
                     stock={p.stock}
-                    imageUrl={imageUrl}         // เผื่อไว้ (ไม่จำเป็นก็ได้)
+
+                    imageUrl={imageUrl}
+
                     imageUrls={p.imageUrls ?? []}
                     onClick={() => router.push(`/product/${p.id}`)}
                   />
@@ -87,13 +91,12 @@ export default function Home() {
         )}
       </div>
 
-      {/* Banner 2.png (ไม่เต็มขอบ, อยู่ใน container เดียวกับสินค้าใหม่) */}
       <div className="px-10 mb-10 flex justify-center">
         <Image
           src="/2.png"
           alt="Promotion Banner"
-          width={1200}   // ปรับตรงนี้
-          height={400}  // อัตราส่วนใกล้เคียงกับรูปจริง
+          width={1200}
+          height={400}
           className="rounded-lg shadow"
         />
       </div>
