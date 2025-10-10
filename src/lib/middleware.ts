@@ -5,31 +5,50 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
 
-// เส้นทางที่ต้องล็อกอินก่อนถึงจะเข้าได้
-const PROTECTED_PATHS = ["/dashboard", "/admin"];
-
-// เส้นทางที่เฉพาะแอดมินเท่านั้นเข้าได้
-const ADMIN_PATHS = ["/admin", "/api/orders/return"];
-
-function matchPath(pathname: string, paths: string[]) {
-  return paths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+// เส้นทางที่ "ต้องล็อกอิน"
+function requiresAuth(pathname: string) {
+  if (pathname === "/") return true; // โฮม
+  if (pathname.startsWith("/dashboard")) return true;
+  if (pathname.startsWith("/admin")) return true;
+  return false;
 }
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // ไฟล์สาธารณะ/asset ต่าง ๆ → ปล่อยผ่าน
+  const isPublicAsset =
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/images") ||
+    pathname.startsWith("/uploads") ||
+    pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|txt|webp|woff2?)$/);
+
+  // หน้า/เส้นทางสาธารณะ → ปล่อยผ่าน
+  const isPublicPage =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/api/login"); // api login ก็ควรสาธารณะ
+
+  if (isPublicAsset || isPublicPage) {
+    return NextResponse.next();
+  }
+
   const token = req.cookies.get("authToken")?.value;
 
-  // เช็คเฉพาะเส้นทางที่ต้องการป้องกัน
-  if (matchPath(pathname, [...PROTECTED_PATHS, ...ADMIN_PATHS])) {
+  // ถ้าเส้นทางนี้ต้องล็อกอิน
+  if (requiresAuth(pathname)) {
     if (!token) {
-      // ถ้าไม่มี token
+      // ถ้าเป็น API → 401, ถ้าเป็นหน้าเว็บ → ส่งไป /login
       if (pathname.startsWith("/api/")) {
         return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { "Content-Type": "application/json" },
         });
       }
-      return NextResponse.redirect(new URL("/auth/login", req.url));
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
     }
 
     try {
@@ -39,18 +58,20 @@ export function middleware(req: NextRequest) {
         role?: string;
       };
 
-      // ถ้าเส้นทางต้องการ role=admin
-      if (matchPath(pathname, ADMIN_PATHS) && decoded.role !== "admin") {
+      // ตัวอย่าง: ถ้าเป็น /admin ต้องการ role=admin
+      if (pathname.startsWith("/admin") && decoded.role !== "admin") {
         if (pathname.startsWith("/api/")) {
           return new NextResponse(JSON.stringify({ error: "Forbidden" }), {
             status: 403,
             headers: { "Content-Type": "application/json" },
           });
         }
-        return NextResponse.redirect(new URL("/auth/login", req.url));
+        const url = req.nextUrl.clone();
+        url.pathname = "/login";
+        return NextResponse.redirect(url);
       }
 
-      // ✅ แนบ user info ไปที่ request header (ใช้ใน API route ต่อได้)
+      // แนบ header ต่อไปยัง API ภายใน
       const requestHeaders = new Headers(req.headers);
       requestHeaders.set("x-user-id", decoded.id);
       requestHeaders.set("x-user-email", decoded.email);
@@ -59,25 +80,27 @@ export function middleware(req: NextRequest) {
       return NextResponse.next({ request: { headers: requestHeaders } });
     } catch (err) {
       console.error("❌ Invalid token:", err);
-
       if (pathname.startsWith("/api/")) {
         return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { "Content-Type": "application/json" },
         });
       }
-      return NextResponse.redirect(new URL("/auth/login", req.url));
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
     }
   }
 
+  // เส้นทางอื่นที่ไม่ได้บังคับล็อกอิน → ผ่าน
   return NextResponse.next();
 }
 
-// ✅ ระบุว่า middleware ใช้กับ path ไหนบ้าง
 export const config = {
   matcher: [
+    "/",               // โฮม
     "/dashboard/:path*",
     "/admin/:path*",
-    "/api/orders/return/:path*",
+    "/api/:path*",     // ถ้ามี API ที่ต้องการ auth ด้วย
   ],
 };
