@@ -78,7 +78,9 @@ export default function Home() {
                     key={p.id}
                     name={p.name}
                     stock={p.stock}
+
                     imageUrl={imageUrl}
+
                     imageUrls={p.imageUrls ?? []}
                     onClick={() => router.push(`/product/${p.id}`)}
                   />
