@@ -1,3 +1,4 @@
+// src/app/(website)/cart/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -22,7 +23,6 @@ type ApiCartItem = {
     id: string;
     name: string;
     imageUrls?: string[];
-    // price / stock ฝั่ง API มีเก็บไว้ แต่เราไม่ได้ใช้ที่นี่โดยตรง
   };
 };
 
@@ -30,7 +30,7 @@ export default function CartPage() {
   const router = useRouter();
   const [items, setItems] = useState<ApiCartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyKey, setBusyKey] = useState<string | null>(null); // สำหรับ disable ปุ่ม item นั้นๆ
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const userId = typeof window !== 'undefined' ? getUserIdForFrontend() : '';
@@ -69,7 +69,6 @@ export default function CartPage() {
     [items]
   );
 
-  // Helpers
   const keyOf = (it: ApiCartItem) => `${it.productId}:${it.size}`;
 
   const handleInc = async (it: ApiCartItem) => {
@@ -92,13 +91,9 @@ export default function CartPage() {
         try { const j = JSON.parse(text); if (j?.error) throw new Error(j.error); } catch {}
         throw new Error(text || `อัปเดตจำนวนล้มเหลว (HTTP ${res.status})`);
       }
-      setItems(prev =>
-        prev.map(x =>
-          keyOf(x) === k
-            ? { ...x, quantity: nextQty, totalPrice: (x.unitPrice ?? 0) * nextQty }
-            : x
-        )
-      );
+
+      // ✅ รีโหลดทั้งหน้า หลังอัปเดตสำเร็จ
+      window.location.reload();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'อัปเดตจำนวนไม่สำเร็จ');
     } finally {
@@ -127,13 +122,9 @@ export default function CartPage() {
         try { const j = JSON.parse(text); if (j?.error) throw new Error(j.error); } catch {}
         throw new Error(text || `อัปเดตจำนวนล้มเหลว (HTTP ${res.status})`);
       }
-      setItems(prev =>
-        prev.map(x =>
-          keyOf(x) === k
-            ? { ...x, quantity: nextQty, totalPrice: (x.unitPrice ?? 0) * nextQty }
-            : x
-        )
-      );
+
+      // ✅ รีโหลดทั้งหน้า หลังอัปเดตสำเร็จ
+      window.location.reload();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'อัปเดตจำนวนไม่สำเร็จ');
     } finally {
@@ -159,7 +150,9 @@ export default function CartPage() {
         try { const j = JSON.parse(text); if (j?.error) throw new Error(j.error); } catch {}
         throw new Error(text || `ลบสินค้าไม่สำเร็จ (HTTP ${res.status})`);
       }
-      setItems(prev => prev.filter(x => keyOf(x) !== k));
+
+      // ✅ รีโหลดทั้งหน้า หลังลบสำเร็จ
+      window.location.reload();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'ลบสินค้าไม่สำเร็จ');
     } finally {
@@ -213,7 +206,7 @@ export default function CartPage() {
                   quantity={it.quantity}
                   image={img}
                   color={'-'}
-                  stockLeft={it.availableStock}  
+                  stockLeft={it.availableStock}
                   onInc={() => handleInc(it)}
                   onDec={() => handleDec(it)}
                   onRemove={() => handleRemove(it)}

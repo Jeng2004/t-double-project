@@ -1,18 +1,42 @@
+// src/app/(website)/components/Navbar.tsx
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { FaUserCircle, FaShoppingCart, FaBars } from 'react-icons/fa';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import { getUserIdForFrontend } from '@/lib/get-user-id';
+
+type ApiCartItem = { productId: string; size: string; quantity: number };
 
 export default function Navbar() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState('');
+  const [cartCount, setCartCount] = useState(0);
+  const [pop, setPop] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const barsBtnRef = useRef<HTMLButtonElement>(null);
 
-  // ปิดเมนูเมื่อคลิกข้างนอก
+  // ------- utils --------
+  const fetchCartCount = async () => {
+    try {
+      const userId = getUserIdForFrontend();
+      if (!userId) { setCartCount(0); return; }
+      const res = await fetch(`/api/cart?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('load cart fail');
+      const items = (await res.json()) as ApiCartItem[];
+      const total = Array.isArray(items) ? items.reduce((s, it) => s + (it.quantity ?? 0), 0) : 0;
+      setCartCount(total);
+    } catch { /* ignore */ }
+  };
+
+  // simple pop animation (ใช้ Tailwind transition + scale)
+  const triggerPop = () => {
+    setPop(true);
+    setTimeout(() => setPop(false), 250);
+  };
+
+  // outside click
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!ref.current) return;
@@ -22,25 +46,50 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
-  // ปิดเมนูเมื่อกด ESC
+  // ESC close
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // initial + light polling
+  useEffect(() => {
+    fetchCartCount();
+    const t = setInterval(fetchCartCount, 20000);
+    return () => clearInterval(t);
+  }, []);
+
+  // cross-tab via storage event
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'cart:lastUpdate') fetchCartCount();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // ให้หน้าอื่นยิง event นี้ได้เพื่อเด้งแบบทันทีในแท็บเดียวกัน
+  useEffect(() => {
+    const onInc = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail as { delta?: number } | undefined;
+      const add = Math.max(1, Number(detail?.delta ?? 1));
+      setCartCount((c) => c + add);
+      triggerPop();
+      try { localStorage.setItem('cart:lastUpdate', String(Date.now())); } catch {}
+    };
+    window.addEventListener('cart:inc', onInc as EventListener);
+    return () => window.removeEventListener('cart:inc', onInc as EventListener);
+  }, []);
+
+  // search
   const submitSearch = () => {
     const q = term.trim();
     if (!q) return;
     router.push(`/Search-product?q=${encodeURIComponent(q)}&page=1`);
     setOpen(false);
   };
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') submitSearch();
-  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') submitSearch(); };
 
   return (
     <nav className="w-full h-16 bg-black text-white flex items-center justify-between px-6">
@@ -70,34 +119,39 @@ export default function Navbar() {
             placeholder="Search product…"
             className="bg-transparent outline-none text-sm placeholder-white/60 w-44 md:w-60"
           />
-          <button
-            onClick={submitSearch}
-            className="ml-2 text-xs bg-white text-black rounded px-2 py-1 font-bold"
-          >
+          <button onClick={submitSearch} className="ml-2 text-xs bg-white text-black rounded px-2 py-1 font-bold">
             Search
           </button>
         </div>
 
-        {/* ไอคอนคงที่ */}
+        {/* โปรไฟล์ */}
         <button
-          className="w-5 h-5 flex items-center justify-center focus:outline-none"
+          className="relative w-5 h-5 flex items-center justify-center focus:outline-none"
           onClick={() => router.push('/profile')}
           aria-label="Profile"
         >
           <FaUserCircle className="w-5 h-5" />
         </button>
 
+        {/* ตะกร้า + badge + pop animation (transition+scale) */}
         <button
-          className="w-5 h-5 flex items-center justify-center focus:outline-none"
+          className={`relative w-5 h-5 flex items-center justify-center focus:outline-none transform transition-transform duration-200 ${pop ? 'scale-125' : 'scale-100'}`}
           onClick={() => router.push('/cart')}
           aria-label="Cart"
         >
           <FaShoppingCart className="w-5 h-5" />
+          {cartCount > 0 && (
+            <span
+              aria-label={`Items in cart: ${cartCount}`}
+              className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center select-none shadow-[0_0_0_2px_rgba(0,0,0,0.6)]"
+            >
+              {cartCount > 99 ? '99+' : cartCount}
+            </span>
+          )}
         </button>
 
         {/* ปุ่ม 3 ขีด */}
         <button
-          ref={barsBtnRef}
           className="w-5 h-5 flex items-center justify-center focus:outline-none"
           onClick={() => setOpen((v) => !v)}
           aria-haspopup="menu"
@@ -116,7 +170,7 @@ export default function Navbar() {
           `}
           role="menu"
         >
-          {/* ช่องค้นหา (เวอร์ชันมือถือในเมนู) */}
+          {/* ช่องค้นหา (มือถือ) */}
           <div className="sm:hidden p-2 border-b">
             <input
               aria-label="Search products"
@@ -154,7 +208,7 @@ export default function Navbar() {
             className="block w-full text-left px-4 py-2 hover:bg-gray-100"
             onClick={async () => {
               await fetch('/api/logout', { method: 'POST' });
-              localStorage.removeItem('userId');
+              try { localStorage.removeItem('userId'); } catch {}
               window.location.href = '/login';
             }}
             role="menuitem"

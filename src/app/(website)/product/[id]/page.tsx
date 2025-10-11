@@ -113,6 +113,75 @@ export default function ProductDetailsPage() {
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
+  // ---------------- Local-stock adjustments (sessionStorage) ----------------
+  const LOCAL_STOCK_KEY = 'localStockAdjustments_v1'; // { [productId]: { S: number, M: number, ... } }
+
+  function readLocalStockAdjustments(): Record<string, Partial<Record<SizeKey, number>>> {
+    try {
+      const raw = sessionStorage.getItem(LOCAL_STOCK_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+
+  function writeLocalStockAdjustments(obj: Record<string, Partial<Record<SizeKey, number>>>) {
+    try {
+      sessionStorage.setItem(LOCAL_STOCK_KEY, JSON.stringify(obj));
+    } catch {
+      // ignore
+    }
+  }
+
+  // delta is positive number of items consumed (we subtract consumed from server stock)
+  function addLocalStockDelta(productId: string, size: SizeKey, delta: number) {
+    try {
+      const store = readLocalStockAdjustments();
+      const prev = store[productId] ?? {};
+      const prevVal = Number.isFinite(Number(prev[size])) ? Number(prev[size]) : 0;
+      prev[size] = prevVal + delta;
+      store[productId] = prev;
+      writeLocalStockAdjustments(store);
+    } catch {
+      // ignore
+    }
+  }
+
+  function applyAdjustmentsToStock(productId: string, stock?: Partial<Record<SizeKey, number | string>>) {
+    const base: Record<SizeKey, number> = {
+      S: toInt(stock?.S),
+      M: toInt(stock?.M),
+      L: toInt(stock?.L),
+      XL: toInt(stock?.XL),
+    };
+    const store = readLocalStockAdjustments();
+    const delta = store[productId] ?? {};
+    (['S','M','L','XL'] as SizeKey[]).forEach((sz) => {
+      const consumed = Number.isFinite(Number(delta[sz])) ? Number(delta[sz]) : 0;
+      base[sz] = Math.max(0, (base[sz] || 0) - consumed);
+    });
+    return base;
+  }
+
+  function applyLocalAdjustmentsToItem(productId: string) {
+    setItem((prev) => {
+      if (!prev || String(prev.id) !== String(productId)) return prev;
+      const newStock = applyAdjustmentsToStock(String(productId), prev.stock);
+      return { ...prev, stock: newStock };
+    });
+  }
+
+  function pickNextAvailableSizeFromStock(stock?: Partial<Record<SizeKey, number | string>>): SizeKey | null {
+    const order: SizeKey[] = ['S', 'M', 'L', 'XL'];
+    if (!stock) return null;
+    for (const s of order) {
+      if (toInt(stock[s]) > 0) return s;
+    }
+    return null;
+  }
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     const pid = id;               // ← ผูกตัวแปรในสโคป effect
     if (!pid) {                   // ถ้าไม่มี id ก็หยุด
@@ -135,13 +204,18 @@ export default function ProductDetailsPage() {
           : (data as ProductDTO);
 
         if (!picked) throw new Error('ไม่พบสินค้าที่ต้องการ');
-        setItem(picked);
+
+        // นำ local adjustments มาปรับ stock ก่อนตั้ง state เพื่อให้การเลือกไซส์อัตโนมัติใช้ค่า adjusted
+        const adjustedStock = applyAdjustmentsToStock(String(picked.id), picked.stock);
+        const pickedWithAdjustedStock: ProductDTO = { ...picked, stock: adjustedStock };
+
+        setItem(pickedWithAdjustedStock);
         setIdx(0);
 
-        // auto เลือกไซส์แรกที่มีสต๊อก
+        // auto เลือกไซส์แรกที่มีสต๊อก (จาก adjustedStock)
         const order: SizeKey[] = ['S', 'M', 'L', 'XL'];
         for (const s of order) {
-          if (toInt(picked.stock?.[s]) > 0) {
+          if (toInt(adjustedStock[s]) > 0) {
             setSelectedSize(s);
             break;
           }
@@ -185,6 +259,8 @@ export default function ProductDetailsPage() {
   const decQty = () => setQty((q) => Math.max(1, q - 1));
   const incQty = () => setQty((q) => Math.min(selectedAvailable || 1, q + 1));
 
+  const routerToPayment = useRouter();
+
   const handleBuyNow = async () => {
     if (!item || !selectedSize) return alert('กรุณาเลือกขนาดก่อน');
     const available = selectedAvailable;
@@ -221,7 +297,7 @@ export default function ProductDetailsPage() {
       ];
       sessionStorage.setItem('buy-now-items', JSON.stringify(payload));
 
-      router.push('/payment?mode=buy-now');
+      routerToPayment.push('/payment?mode=buy-now');
     } catch (e) {
       alert(e instanceof Error ? e.message : 'เกิดข้อผิดพลาดระหว่าง “ซื้อเลย”');
     } finally {
@@ -229,6 +305,7 @@ export default function ProductDetailsPage() {
     }
   };
 
+  // แทนที่ handleAddToCart เดิมทั้งก้อนด้วยอันนี้
   const handleAddToCart = async () => {
     if (!item || !selectedSize) return alert('กรุณาเลือกขนาดก่อน');
     const available = selectedAvailable;
@@ -242,6 +319,11 @@ export default function ProductDetailsPage() {
     try {
       setSubmitting(true);
       const userId = getUserIdForFrontend();
+      if (!userId) {
+        alert('กรุณาเข้าสู่ระบบก่อนซื้อสินค้า');
+        return;
+      }
+
       const res = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -253,15 +335,30 @@ export default function ProductDetailsPage() {
           size: selectedSize,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || 'ไม่สามารถเพิ่มลงตะกร้าได้');
+      }
+
+      // แจ้ง Navbar ให้เด้ง badge และ sync ข้ามแท็บ
+      window.dispatchEvent(new CustomEvent('cart:inc', { detail: { delta: qty } }));
+      try { localStorage.setItem('cart:lastUpdate', String(Date.now())); } catch {}
+
       alert('เพิ่มสินค้าลงตะกร้าเรียบร้อย');
-      setQty(1);
+
+      // รีหน้าแรง ๆ ให้สต็อก/หน้าปัจจุบันโหลดใหม่ทั้งหมด
+      window.location.reload();
+
+      // (ถ้าอยากรีเฟรชแบบเบา ๆ แทน hard reload ใช้ router.refresh() ได้ แต่หน้า client-only อาจไม่ refetch)
+      // router.refresh();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'ไม่สามารถเพิ่มลงตะกร้าได้');
     } finally {
       setSubmitting(false);
     }
   };
+
 
   if (loading) {
     return (
