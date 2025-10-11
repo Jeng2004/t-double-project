@@ -1,15 +1,16 @@
+// src/app/api/cart/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// 📝 Logger helpers (ADD ONLY)
+// 📝 Logger helpers
 const logPrefix = "🧺 CartAPI";
 const log = (...args: any[]) => console.log(logPrefix, ...args);
 const info = (...args: any[]) => console.info(logPrefix, ...args);
 const warn = (...args: any[]) => console.warn(logPrefix, ...args);
 
-// 📦 GET - ดูตะกร้าของ user พร้อมราคา + stock ปัจจุบัน
+// ---------- GET - ดูตะกร้าของ user พร้อมราคา + stock ปัจจุบัน ----------
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get("userId");
   info("GET /api/cart", { userId });
@@ -29,16 +30,16 @@ export async function GET(req: NextRequest) {
     });
     info("GET cartItems count:", cartItems.length);
 
-    // 🔹 ADD: เคลียร์รายการที่สต็อก (size) หมดออกจากตะกร้าอัตโนมัติ
+    // เคลียร์รายการที่สต็อก (size) หมดออกจากตะกร้าอัตโนมัติ
     const toRemoveIds: string[] = [];
 
     const enrichedItems = cartItems.map((item) => {
       const size = item.size as keyof typeof item.product.price;
-      const unitPrice = item.product?.price?.[size] ?? 0;
+      const unitPrice = (item.product?.price as any)?.[size] ?? 0;
       const totalPrice = unitPrice * item.quantity;
 
-      // ✅ ดึง stock ปัจจุบันของ size นี้
-      const stockBySize = item.product?.stock as Record<string, number>;
+      // ดึง stock ปัจจุบันของ size นี้
+      const stockBySize = (item.product?.stock || {}) as Record<string, number>;
       const availableStock = stockBySize?.[size as string] ?? 0;
 
       log("GET item", {
@@ -84,13 +85,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ➕ POST - เพิ่มสินค้าเข้าตะกร้า พร้อมตรวจสอบ stock
+// ---------- POST - เพิ่มสินค้าเข้าตะกร้า พร้อมตรวจสอบ stock และลด stock จริงใน DB ----------
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { userId, productId, quantity, size } = body;
   info("POST /api/cart", { userId, productId, quantity, size });
 
-  if (!userId || !productId || quantity <= 0 || !size) {
+  if (!userId || !productId || !size || Number(quantity) <= 0) {
     warn("POST invalid payload", body);
     return NextResponse.json(
       { error: "ข้อมูลไม่ครบหรือ quantity/size ไม่ถูกต้อง" },
@@ -99,67 +100,60 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // 1) ดึงสินค้า (fresh)
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) {
       warn("POST product not found", { productId });
       return NextResponse.json({ error: "ไม่พบสินค้า" }, { status: 404 });
     }
 
-    // ✅ ตรวจสอบ stock ของ size นั้น
-    const stockBySize = product.stock as Record<string, number>; // สมมติว่ามี field product.stock เก็บจำนวนตามไซส์
-    const availableStock = stockBySize?.[size] ?? 0;
+    const stockBySize = (product.stock || {}) as Record<string, number>;
+    const availableStock = Number.isFinite(Number(stockBySize?.[size])) ? Number(stockBySize[size]) : 0;
     info("POST stock check", { productId, size, availableStock });
 
-    // 🔹 ADD: ถ้าสต็อก size นี้หมด -> ลบ item เดิม (ถ้ามี) แล้วแจ้งเลย
     if (availableStock === 0) {
+      // ถ้าหมดจริง ๆ -> ลบ item เดิมในตะกร้าผู้ใช้ (เหมือนเดิม)
       warn("POST out of stock -> clearing existing cartItem", { userId, productId, size });
-      const delRes = await prisma.cartItem.deleteMany({ where: { userId, productId, size } });
-      info("POST deleteMany (out-of-stock) result:", delRes);
+      await prisma.cartItem.deleteMany({ where: { userId, productId, size } });
       return NextResponse.json(
         { error: "สินค้าหมดสต็อก และถูกนำออกจากตะกร้าแล้ว" },
-        { status: 410 } // Gone
+        { status: 410 }
       );
     }
 
-    // หา item เดิมที่ user เคยใส่แล้ว
+    // 2) หา cart item เดิมของ user สำหรับ product+size
     const existingItem = await prisma.cartItem.findFirst({
       where: { userId, productId, size },
     });
-    info("POST existingItem:", existingItem ? { id: existingItem.id, quantity: existingItem.quantity } : null);
 
-    const requestedQty = existingItem ? existingItem.quantity + quantity : quantity;
-    info("POST requestedQty vs available", { requestedQty, availableStock });
-
-    if (requestedQty > availableStock) {
-      warn("POST insufficient stock", { requestedQty, availableStock });
+    const requestedQtyTotal = existingItem ? existingItem.quantity + Number(quantity) : Number(quantity);
+    if (requestedQtyTotal > availableStock) {
+      warn("POST insufficient stock", { requestedQtyTotal, availableStock });
       return NextResponse.json(
-        { error: "สินค้าในสต็อกไม่เพียงพอ" },
-        { status: 409 } // Conflict
+        { error: `สินค้าในสต็อกไม่เพียงพอ (คงเหลือ ${availableStock})` },
+        { status: 409 }
       );
     }
 
+    // 3) สร้าง/อัปเดต cartItem
     const sizeKey = size as keyof typeof product.price;
-    const unitPrice = product.price?.[sizeKey] ?? 0;
-    const totalPrice = unitPrice * requestedQty;
+    const unitPrice = (product.price as any)?.[sizeKey] ?? 0;
 
-    let result;
+    let cartResult;
     if (existingItem) {
-      info("POST updating existing cartItem", { id: existingItem.id, requestedQty, unitPrice, totalPrice });
-      result = await prisma.cartItem.update({
+      const newQty = existingItem.quantity + Number(quantity);
+      const newTotalPrice = Number(unitPrice) * newQty;
+      cartResult = await prisma.cartItem.update({
         where: { id: existingItem.id },
-        data: {
-          quantity: requestedQty,
-          unitPrice,
-          totalPrice,
-        },
+        data: { quantity: newQty, unitPrice, totalPrice: newTotalPrice },
       });
     } else {
-      info("POST creating new cartItem", { userId, productId, quantity, size, unitPrice, totalPrice });
-      result = await prisma.cartItem.create({
+      const totalPrice = Number(unitPrice) * Number(quantity);
+      cartResult = await prisma.cartItem.create({
         data: {
           userId,
           productId,
-          quantity,
+          quantity: Number(quantity),
           size,
           unitPrice,
           totalPrice,
@@ -167,14 +161,30 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    info("POST result cartItem id:", result.id);
+    // 4) อัปเดต stock ใน product (ลดจำนวนที่เพิ่มเข้าตะกร้า)
+    // อ่าน stock ปัจจุบันอีกครั้งเพื่อความแน่นอน
+    const freshProduct = await prisma.product.findUnique({ where: { id: productId } });
+    const freshStock = (freshProduct?.stock || {}) as Record<string, number>;
+    const prevVal = Number.isFinite(Number(freshStock[size])) ? Number(freshStock[size]) : 0;
+    const newVal = Math.max(0, prevVal - Number(quantity));
+    const newStockObj = { ...(freshStock || {}) };
+    newStockObj[size] = newVal;
 
+    await prisma.product.update({
+      where: { id: productId },
+      data: { stock: newStockObj },
+    });
+
+    info("POST updated stock for product", { productId, size, prevVal, newVal });
+
+    // 5) ตอบกลับ (รวม stock ปัจจุบันเพื่อให้ client อัปเดต)
     return NextResponse.json(
       {
-        ...result,
+        ...cartResult,
         unitPrice,
-        totalPrice,
+        totalPrice: unitPrice * (existingItem ? existingItem.quantity + Number(quantity) : Number(quantity)),
         message: "เพิ่มสินค้าลงตะกร้าเรียบร้อย",
+        productStock: newStockObj,
       },
       { status: 201 }
     );
@@ -184,14 +194,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-
-// 🔄 PATCH - อัปเดตจำนวนสินค้าในตะกร้า พร้อมตรวจสอบ stock
+// ---------- PATCH - อัปเดตจำนวนสินค้าในตะกร้า พร้อมปรับ stock ใน DB ----------
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const { userId, productId, quantity, size } = body;
   info("PATCH /api/cart", { userId, productId, quantity, size });
 
-  if (!userId || !productId || quantity < 0 || !size) {
+  if (!userId || !productId || !size || typeof quantity !== "number" || quantity < 0) {
     warn("PATCH invalid payload", body);
     return NextResponse.json(
       { error: "ข้อมูลไม่ครบหรือ quantity/size ไม่ถูกต้อง" },
@@ -200,73 +209,69 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
+    const existingCartItem = await prisma.cartItem.findFirst({
+      where: { userId, productId, size },
+    });
+    if (!existingCartItem) {
+      warn("PATCH cartItem not found", { userId, productId, size });
+      return NextResponse.json({ error: "ไม่พบสินค้าในตะกร้า" }, { status: 404 });
+    }
+
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) {
       warn("PATCH product not found", { productId });
       return NextResponse.json({ error: "ไม่พบสินค้า" }, { status: 404 });
     }
 
-    const unitPrice = (product.price as Record<string, number>)[size];
-    if (typeof unitPrice !== "number") {
-      warn("PATCH unitPrice missing for size", { size, productId });
-      return NextResponse.json({ error: "ไม่พบราคาของไซส์นี้" }, { status: 400 });
-    }
-
-    // ✅ ตรวจสอบ stock ก่อนอัปเดต
-    const stockBySize = product.stock as Record<string, number>; // สมมติว่าเก็บ stock แยกตาม size
-    const availableStock = stockBySize?.[size] ?? 0;
+    const stockBySize = (product.stock || {}) as Record<string, number>;
+    const availableStock = Number.isFinite(Number(stockBySize?.[size])) ? Number(stockBySize[size]) : 0;
     info("PATCH stock check", { productId, size, availableStock });
 
-    // 🔹 ADD: สต็อก size นี้หมด -> ลบออกจากตะกร้าอัตโนมัติ
-    if (availableStock === 0) {
-      warn("PATCH out of stock -> deleting cartItem", { userId, productId, size });
-      const delRes = await prisma.cartItem.deleteMany({ where: { userId, productId, size } });
-      info("PATCH deleteMany (out-of-stock) result:", delRes);
-      return NextResponse.json(
-        { message: "สินค้าหมดสต็อก และถูกนำออกจากตะกร้าแล้ว" },
-        { status: 200 }
-      );
+    // diff = newQuantity - oldQuantity
+    const diff = Number(quantity) - existingCartItem.quantity;
+
+    if (diff > 0) {
+      // ต้องการเพิ่มจำนวนในตะกร้า -> ตรวจสอบสต็อกให้พอ (ต้องเหลือ >= diff)
+      if (diff > availableStock) {
+        warn("PATCH insufficient stock", { diff, availableStock });
+        return NextResponse.json({ error: "สินค้าในสต็อกไม่เพียงพอ" }, { status: 409 });
+      }
     }
 
-    if (quantity > availableStock) {
-      warn("PATCH insufficient stock", { quantity, availableStock });
-      return NextResponse.json(
-        { error: "สินค้าในสต็อกไม่เพียงพอ" },
-        { status: 409 } // Conflict
-      );
-    }
-
+    // อัปเดต cart item
     if (quantity === 0) {
-      info("PATCH quantity=0 -> deleting cartItem", { userId, productId, size });
-      const delRes = await prisma.cartItem.deleteMany({ where: { userId, productId, size } });
-      info("PATCH deleteMany result:", delRes);
-      return NextResponse.json({ message: "ลบสินค้าเรียบร้อย" }, { status: 200 });
+      // หากส่ง 0 -> ลบรายการ
+      await prisma.cartItem.deleteMany({ where: { userId, productId, size } });
+    } else {
+      await prisma.cartItem.updateMany({
+        where: { userId, productId, size },
+        data: {
+          quantity,
+          unitPrice: (product.price as any)?.[size] ?? 0,
+          totalPrice: ((product.price as any)?.[size] ?? 0) * quantity,
+        },
+      });
     }
 
-    info("PATCH updating cartItem", { userId, productId, size, quantity, unitPrice });
-    const updated = await prisma.cartItem.updateMany({
-      where: { userId, productId, size },
-      data: {
-        quantity,
-        unitPrice,
-        totalPrice: unitPrice * quantity, // อัปเดต totalPrice ด้วย
-      },
+    // อัปเดต stock ใน product ตาม diff (ถ้า diff>0 ลด stock; ถ้า diff<0 คืน stock)
+    const freshProduct = await prisma.product.findUnique({ where: { id: productId } });
+    const freshStock = (freshProduct?.stock || {}) as Record<string, number>;
+    const prevVal = Number.isFinite(Number(freshStock[size])) ? Number(freshStock[size]) : 0;
+    const updatedStockForSize = Math.max(0, prevVal - Math.max(0, diff)); // ถ้า diff>0 ลด by diff; ถ้า diff<=0 ไม่ลด
+    // หาก diff < 0 (ลดจำนวนในตะกร้า) ให้คืน stockแทน:
+    const finalStockVal = diff < 0 ? prevVal + Math.abs(diff) : updatedStockForSize;
+    const newStockObj = { ...(freshStock || {}) };
+    newStockObj[size] = finalStockVal;
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: { stock: newStockObj },
     });
-    info("PATCH updateMany result:", updated);
 
-    if (updated.count === 0) {
-      warn("PATCH cartItem not found to update", { userId, productId, size });
-      return NextResponse.json({ error: "ไม่พบสินค้าในตะกร้า" }, { status: 404 });
-    }
+    info("PATCH updated stock for product", { productId, size, prevVal, finalStockVal });
 
     return NextResponse.json(
-      {
-        message: "อัปเดตจำนวนเรียบร้อย",
-        size,
-        quantity,
-        unitPrice,
-        total: unitPrice * quantity,
-      },
+      { message: "อัปเดตจำนวนเรียบร้อย", size, quantity, productStock: newStockObj },
       { status: 200 }
     );
   } catch (err) {
@@ -275,8 +280,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-
-// 🗑 DELETE - ลบสินค้าออกจากตะกร้า + คืน stock ปัจจุบัน
+// ---------- DELETE - ลบสินค้าออกจากตะกร้า + คืน stock ปัจจุบัน ----------
 export async function DELETE(req: NextRequest) {
   const body = await req.json();
   const { userId, productId, size } = body;
@@ -291,30 +295,45 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
+    // หา cart item ก่อนลบ เพื่อดึงจำนวนที่จะคืนสต็อก
+    const existingCartItem = await prisma.cartItem.findFirst({
+      where: { userId, productId, size },
+    });
+
+    if (!existingCartItem) {
+      warn("DELETE cartItem not found", { userId, productId, size });
+      return NextResponse.json({ error: "ไม่พบสินค้าในตะกร้า" }, { status: 404 });
+    }
+
+    const restoreQty = existingCartItem.quantity;
+
     // ลบ item ออกจากตะกร้า
-    info("DELETE deleting cartItem(s)", { userId, productId, size });
     const deleted = await prisma.cartItem.deleteMany({
       where: { userId, productId, size },
     });
     info("DELETE deleteMany result:", deleted);
 
-    if (deleted.count === 0) {
-      warn("DELETE cartItem not found", { userId, productId, size });
-      return NextResponse.json({ error: "ไม่พบสินค้าในตะกร้า" }, { status: 404 });
-    }
-
-    // ✅ ดึง product มาหา stock ปัจจุบัน
+    // คืน stock ให้ product ตามจำนวนที่อยู่ใน cart
     const product = await prisma.product.findUnique({ where: { id: productId } });
-    const stockBySize = product?.stock as Record<string, number>;
-    const availableStock = stockBySize?.[size] ?? 0;
-    info("DELETE stock after removal", { productId, size, availableStock });
+    const freshStock = (product?.stock || {}) as Record<string, number>;
+    const prevVal = Number.isFinite(Number(freshStock[size])) ? Number(freshStock[size]) : 0;
+    const newVal = prevVal + restoreQty;
+    const newStockObj = { ...(freshStock || {}) };
+    newStockObj[size] = newVal;
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: { stock: newStockObj },
+    });
+
+    info("DELETE restored stock for product", { productId, size, prevVal, newVal });
 
     return NextResponse.json(
       {
-        message: "ลบสินค้าเรียบร้อย",
+        message: "ลบสินค้าเรียบร้อย และคืนสต็อกแล้ว",
         productId,
         size,
-        availableStock, // ส่ง stock ปัจจุบันกลับไปด้วย
+        availableStock: newVal,
       },
       { status: 200 }
     );

@@ -235,21 +235,7 @@ export default function ReturnProductDetailPage() {
     }
   }
 
-  async function doDelete() {
-    if (!reqData) return;
-    if (!confirm('ต้องการลบคำขอคืนสินค้านี้หรือไม่?')) return;
-    try {
-      setActing('delete');
-      const res = await fetch(`/api/orders/return/${reqData.id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string } | null)?.error || 'ลบคำขอไม่สำเร็จ');
-      router.back();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'ลบคำขอไม่สำเร็จ');
-    } finally {
-      setActing(null);
-    }
-  }
+
 
   if (loading) {
     return (
@@ -397,11 +383,7 @@ export default function ReturnProductDetailPage() {
             ย้อนกลับ
           </button>
 
-          {String(reqData.status) !== 'อนุมัติ' && String(reqData.status) !== 'ปฏิเสธ' && (
-            <button className={styles.btnGhostDanger} disabled={acting === 'delete'} onClick={doDelete}>
-              {acting === 'delete' ? 'กำลังลบ…' : 'ลบคำขอ'}
-            </button>
-          )}
+
         </div>
       </div>
     </div>
