@@ -1,4 +1,3 @@
-// src/app/(website)/cart/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -16,9 +15,9 @@ type ApiCartItem = {
   productId: string;
   size: SizeKey;
   quantity: number;
-  unitPrice?: number;      // server เติมให้ใน GET/POST/PATCH
-  totalPrice?: number;     // server เติมให้ใน GET/POST/PATCH
-  availableStock?: number; // server เติมให้ใน GET
+  unitPrice?: number;
+  totalPrice?: number;
+  availableStock?: number;
   product?: {
     id: string;
     name: string;
@@ -71,11 +70,11 @@ export default function CartPage() {
 
   const keyOf = (it: ApiCartItem) => `${it.productId}:${it.size}`;
 
-  const handleInc = async (it: ApiCartItem) => {
+  const handleSetQty = async (it: ApiCartItem, nextQtyRaw: number) => {
+    const nextQty = Math.max(1, Math.floor(Number(nextQtyRaw) || 1));
     const k = keyOf(it);
     setBusyKey(k);
     try {
-      const nextQty = (it.quantity ?? 0) + 1;
       const res = await fetch('/api/cart', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -91,8 +90,7 @@ export default function CartPage() {
         try { const j = JSON.parse(text); if (j?.error) throw new Error(j.error); } catch {}
         throw new Error(text || `อัปเดตจำนวนล้มเหลว (HTTP ${res.status})`);
       }
-
-      // ✅ รีโหลดทั้งหน้า หลังอัปเดตสำเร็จ
+      // รีโหลดทั้งหน้าให้ sync
       window.location.reload();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'อัปเดตจำนวนไม่สำเร็จ');
@@ -101,35 +99,11 @@ export default function CartPage() {
     }
   };
 
-  const handleDec = async (it: ApiCartItem) => {
-    if (it.quantity <= 1) return;
-    const k = keyOf(it);
-    setBusyKey(k);
-    try {
-      const nextQty = (it.quantity ?? 0) - 1;
-      const res = await fetch('/api/cart', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          productId: it.productId,
-          size: it.size,
-          quantity: nextQty,
-        }),
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        try { const j = JSON.parse(text); if (j?.error) throw new Error(j.error); } catch {}
-        throw new Error(text || `อัปเดตจำนวนล้มเหลว (HTTP ${res.status})`);
-      }
+  const handleInc = (it: ApiCartItem) => handleSetQty(it, (it.quantity ?? 0) + 1);
 
-      // ✅ รีโหลดทั้งหน้า หลังอัปเดตสำเร็จ
-      window.location.reload();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'อัปเดตจำนวนไม่สำเร็จ');
-    } finally {
-      setBusyKey(null);
-    }
+  const handleDec = (it: ApiCartItem) => {
+    if (it.quantity <= 1) return;
+    handleSetQty(it, (it.quantity ?? 0) - 1);
   };
 
   const handleRemove = async (it: ApiCartItem) => {
@@ -150,8 +124,6 @@ export default function CartPage() {
         try { const j = JSON.parse(text); if (j?.error) throw new Error(j.error); } catch {}
         throw new Error(text || `ลบสินค้าไม่สำเร็จ (HTTP ${res.status})`);
       }
-
-      // ✅ รีโหลดทั้งหน้า หลังลบสำเร็จ
       window.location.reload();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'ลบสินค้าไม่สำเร็จ');
@@ -205,11 +177,12 @@ export default function CartPage() {
                   price={price}
                   quantity={it.quantity}
                   image={img}
-                  color={'-'}
+                  color="-"
                   stockLeft={it.availableStock}
                   onInc={() => handleInc(it)}
                   onDec={() => handleDec(it)}
                   onRemove={() => handleRemove(it)}
+                  onSetQty={(q) => handleSetQty(it, q)}   // ✅ ส่งฟังก์ชันตั้งจำนวน
                   disabled={disabled}
                 />
               );
