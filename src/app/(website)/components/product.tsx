@@ -1,3 +1,4 @@
+// src/app/(website)/components/product.tsx
 'use client';
 
 import Image from 'next/image';
@@ -30,12 +31,11 @@ export default function Product({ name, stock, imageUrl, imageUrls, onClick }: P
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startSlide = () => {
-    if (images.length <= 1) return;
-    // กันซ้อน
+    if (images.length <= 1 || isOutOfStock) return; // ไม่สไลด์เมื่อหมดสต็อก
     if (timerRef.current) return;
     timerRef.current = setInterval(() => {
       setIdx((i) => (i + 1) % images.length);
-    }, 800); // ความเร็วเปลี่ยนรูป (ms) ปรับได้
+    }, 800);
   };
 
   const stopSlide = () => {
@@ -43,7 +43,7 @@ export default function Product({ name, stock, imageUrl, imageUrls, onClick }: P
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    setIdx(0); // กลับเป็นรูปแรกเมื่อเอาเมาส์ออก
+    setIdx(0);
   };
 
   useEffect(() => {
@@ -52,32 +52,78 @@ export default function Product({ name, stock, imageUrl, imageUrls, onClick }: P
     };
   }, []);
 
+  // ปิดคลิก/คีย์บอร์ดเมื่อหมดสต็อก
+  const handleClick = () => {
+    if (isOutOfStock) return;
+    onClick?.();
+  };
+  const handleKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (isOutOfStock) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick?.();
+    }
+  };
+
   return (
     <div
       className={styles.card}
-      onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role={onClick && !isOutOfStock ? 'button' : undefined}
+      tabIndex={onClick && !isOutOfStock ? 0 : -1}
+      aria-disabled={isOutOfStock || undefined}
+      title={isOutOfStock ? 'สินค้าหมดแล้ว' : name}
+      style={{
+        cursor: onClick && !isOutOfStock ? 'pointer' : 'default',
+        opacity: isOutOfStock ? 0.65 : 1,
+        pointerEvents: isOutOfStock ? 'auto' : 'auto', // ยอมให้โฮเวอร์ได้ แต่เราบล็อกคลิกใน handleClick อยู่แล้ว
+      }}
     >
       <div
         className={styles.imageWrapper}
         onMouseEnter={startSlide}
         onMouseLeave={stopSlide}
+        style={{ position: 'relative' }}
       >
         <Image
-          key={images[idx]}              // บังคับให้รีเรนเดอร์เมื่อ src เปลี่ยน
+          key={images[idx]}
           src={images[idx]}
           alt={name}
           fill
           className={styles.image}
           sizes="(max-width: 480px) 100vw, (max-width: 1024px) 33vw, 25vw"
         />
+
+        {/* Overlay “สินค้าหมดแล้ว” */}
+        {isOutOfStock && (
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.55))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              color: '#fff',
+              fontSize: '0.95rem',
+              letterSpacing: 0.3,
+              borderRadius: '8px',
+            }}
+          >
+            สินค้าหมดแล้ว
+          </div>
+        )}
       </div>
 
       <div className={styles.info}>
         <p className={styles.name}>{name}</p>
 
         {isOutOfStock ? (
-          <p className={styles.outOfStock}>สินค้าหมดแล้ว</p>
+          <p className={styles.outOfStock}>หมดสต็อก</p>
         ) : (
           <div className={styles.sizes}>
             {sizeOrder.map((s) => {
