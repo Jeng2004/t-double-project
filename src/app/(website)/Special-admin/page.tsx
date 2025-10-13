@@ -6,13 +6,16 @@ import { useRouter } from 'next/navigation';
 import styles from './Specail-admin.module.css';
 import NavbarAdmin from '../components/NavbarAdmin';
 
+/** ให้สถานะตรงกับหน้า Special-admin-id/[id] */
 type AllowedStatus =
   | 'ยกเลิก'
+  | 'ยกเลิก - คืนเงินเรียบร้อย'
   | 'รอชำระเงิน'
   | 'รอดำเนินการ'
   | 'กำลังดำเนินการจัดเตรียมสินค้า'
   | 'กำลังดำเนินการจัดส่งสินค้า'
-  | 'จัดส่งสินค้าสำเร็จเเล้ว';
+  | 'จัดส่งสินค้าสำเร็จเเล้ว'
+  | 'ลูกค้าคืนสินค้า';
 
 type SpecialOrder = {
   id: string;
@@ -28,7 +31,6 @@ type SpecialOrder = {
   user?: { name?: string | null; email?: string | null } | null;
 };
 
-/** รูปร่างข้อมูลที่ API อาจส่งมา (สำหรับ parse แบบมี type) */
 type SpecialOrderApi = {
   id?: string | number;
   productName?: string | null;
@@ -43,13 +45,16 @@ type SpecialOrderApi = {
   user?: { name?: string | null; email?: string | null } | null;
 };
 
+/** รวมสถานะทั้งหมดที่อยากให้หน้า list รองรับ */
 const STATUS_LIST: AllowedStatus[] = [
   'ยกเลิก',
+  'ยกเลิก - คืนเงินเรียบร้อย',
   'รอชำระเงิน',
   'รอดำเนินการ',
   'กำลังดำเนินการจัดเตรียมสินค้า',
   'กำลังดำเนินการจัดส่งสินค้า',
   'จัดส่งสินค้าสำเร็จเเล้ว',
+  'ลูกค้าคืนสินค้า',
 ];
 
 const nf = (n: number) => new Intl.NumberFormat('th-TH').format(n);
@@ -66,9 +71,36 @@ const toNum = (v: unknown) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+
+/** parse สถานะจาก API ให้คงสถานะจริง ถ้าไม่อยู่ในลิสต์จะ fallback เป็น 'รอดำเนินการ' */
 const toStatus = (s: unknown): AllowedStatus => {
-  const v = String(s ?? '').trim();
-  return (STATUS_LIST as string[]).includes(v) ? (v as AllowedStatus) : 'รอดำเนินการ';
+  const raw = String(s ?? '').trim();
+  if ((STATUS_LIST as string[]).includes(raw)) return raw as AllowedStatus;
+  return 'รอดำเนินการ';
+};
+
+/** map class ป้ายสถานะ โดยพยายามใช้ class เดิมที่มีอยู่ */
+const pillClass = (s: AllowedStatus) => {
+  switch (s) {
+    case 'ยกเลิก':
+    case 'ยกเลิก - คืนเงินเรียบร้อย':
+      return `${styles.pill} ${styles.pillCancelled}`; // ใช้สีเดียวกับยกเลิก
+    case 'รอชำระเงิน':
+      return `${styles.pill} ${styles.pillUnpaid}`;
+    case 'รอดำเนินการ':
+      return `${styles.pill} ${styles.pillPending}`;
+    case 'กำลังดำเนินการจัดเตรียมสินค้า':
+      return `${styles.pill} ${styles.pillPreparing}`;
+    case 'กำลังดำเนินการจัดส่งสินค้า':
+      return `${styles.pill} ${styles.pillShipping}`;
+    case 'จัดส่งสินค้าสำเร็จเเล้ว':
+      return `${styles.pill} ${styles.pillCompleted}`;
+    case 'ลูกค้าคืนสินค้า':
+      // ถ้าไม่มีคลาสเฉพาะ ให้ใช้ cancelled (หรือจะเปลี่ยนเป็น completed ก็ได้)
+      return `${styles.pill} ${styles.pillCancelled}`;
+    default:
+      return styles.pill;
+  }
 };
 
 export default function SpecailAdminPage() {
@@ -94,15 +126,13 @@ export default function SpecailAdminPage() {
         const text = await res.text();
         if (!res.ok) throw new Error(`HTTP ${res.status} ${text}`);
 
-        // พยายาม parse JSON; ถ้าไม่ใช่ JSON จะโยน text กลับ
         let jsonUnknown: unknown;
         try {
           jsonUnknown = JSON.parse(text);
         } catch {
-          jsonUnknown = text; // ไม่ใช่ JSON
+          jsonUnknown = text;
         }
 
-        // รองรับหลายรูปแบบผลลัพธ์: [ ... ] | { orders:[...] } | { order:{...} }
         let listUnknown: unknown[] = [];
         if (Array.isArray(jsonUnknown)) {
           listUnknown = jsonUnknown;
@@ -113,7 +143,7 @@ export default function SpecailAdminPage() {
         }
 
         const mapped: SpecialOrder[] = listUnknown.map((rowUnknown) => {
-          const o = rowUnknown as SpecialOrderApi; // cast จาก unknown → รูปร่าง API
+          const o = rowUnknown as SpecialOrderApi;
           return {
             id: toStr(o.id),
             productName: toStr(o.productName ?? 'Special Order'),
@@ -151,24 +181,6 @@ export default function SpecailAdminPage() {
     );
   }, [rows, q]);
 
-  const pillClass = (s: AllowedStatus) => {
-    switch (s) {
-      case 'ยกเลิก':
-        return `${styles.pill} ${styles.pillCancelled}`;
-      case 'รอชำระเงิน':
-        return `${styles.pill} ${styles.pillUnpaid}`;
-      case 'รอดำเนินการ':
-        return `${styles.pill} ${styles.pillPending}`;
-      case 'กำลังดำเนินการจัดเตรียมสินค้า':
-        return `${styles.pill} ${styles.pillPreparing}`;
-      case 'กำลังดำเนินการจัดส่งสินค้า':
-        return `${styles.pill} ${styles.pillShipping}`;
-      case 'จัดส่งสินค้าสำเร็จเเล้ว':
-      default:
-        return `${styles.pill} ${styles.pillCompleted}`;
-    }
-  };
-
   const openPopover = (order: SpecialOrder, e: React.MouseEvent<HTMLButtonElement>) => {
     setOpenForId(order.id);
     setDraftStatus(order.status);
@@ -187,9 +199,7 @@ export default function SpecailAdminPage() {
       });
       if (!res.ok) throw new Error(`PATCH ${res.status}: ${await res.text()}`);
 
-      setRows((prev) =>
-        prev.map((r) => (r.id === openForId ? { ...r, status: draftStatus } : r))
-      );
+      setRows((prev) => prev.map((r) => (r.id === openForId ? { ...r, status: draftStatus } : r)));
       setOpenForId(null);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'อัปเดตไม่สำเร็จ');
@@ -265,6 +275,7 @@ export default function SpecailAdminPage() {
                         <button
                           className={pillClass(r.status)}
                           onClick={(e) => openPopover(r, e)}
+                          title="เปลี่ยนสถานะ"
                         >
                           {r.status}
                         </button>

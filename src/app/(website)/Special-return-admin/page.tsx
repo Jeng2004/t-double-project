@@ -10,7 +10,7 @@ type ReturnRequest = {
   specialOrderId: string;
   reason: string | null;
   images: string[];             // public path เช่น /uploads/xxx.jpg
-  status: 'pending' | 'อนุมัติ' | 'ปฏิเสธ';
+  status: 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ';
   adminNote?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -140,7 +140,7 @@ export default function SpecialReturnAdminPage() {
 
   const pillCls = (s: RequestWithOrder['status']) => {
     switch (s) {
-      case 'pending':
+      case 'รอดำเนินการ':
         return `${styles.pill} ${styles.pillPending}`;
       case 'อนุมัติ':
         return `${styles.pill} ${styles.pillApproved}`;
