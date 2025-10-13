@@ -1,4 +1,3 @@
-// src/app/(website)/Special-Size/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -8,8 +7,22 @@ import { getUserIdForFrontend } from '@/lib/get-user-id';
 
 type Mode = 'preset' | 'custom';
 
+type DBProduct = {
+  id: string;
+  name: string;
+  category?: string | null;
+};
+
 export default function SpecialSizePage() {
-  const userId = typeof window !== 'undefined' ? getUserIdForFrontend() : '';
+  // ✅ กัน hydration mismatch
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+
+  // ✅ อ่าน userId ฝั่ง client เท่านั้น
+  const [userId, setUserId] = useState('');
+  useEffect(() => {
+    setUserId(getUserIdForFrontend());
+  }, []);
 
   // ฟอร์ม
   const [firstName, setFirstName] = useState('');
@@ -18,9 +31,9 @@ export default function SpecialSizePage() {
   const [email, setEmail]         = useState('');
   const [address, setAddress]     = useState('');
 
-  const [category, setCategory] = useState('เสื้อยืด');       // เดิม productType
-  const [productName, setProductName] = useState('');          // เดิม model
-  const [color, setColor] = useState('');                      // ★ เพิ่ม เพื่อแมปกับ API ใหม่
+  const [category, setCategory] = useState('เสื้อยืด');
+  const [productName, setProductName] = useState('');
+  const [color, setColor] = useState('');
   const [quantity, setQuantity] = useState<number | ''>('');
 
   const [mode, setMode]             = useState<Mode>('preset');
@@ -32,11 +45,16 @@ export default function SpecialSizePage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage]       = useState<string | null>(null);
 
-  // preload โปรไฟล์ (ถ้ามี userId)
+  // ✅ รายการสินค้าทั้งหมด
+  const [allProducts, setAllProducts] = useState<DBProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+
+  // preload โปรไฟล์
   useEffect(() => {
+    if (!userId) return;
     let ignore = false;
     const load = async () => {
-      if (!userId) return;
       try {
         const res = await fetch(`/api/profile?userId=${userId}`, { cache: 'no-store' });
         if (!res.ok) return;
@@ -48,15 +66,49 @@ export default function SpecialSizePage() {
         setEmail(data?.user?.email ?? '');
         setPhone(data?.user?.phone ?? '');
         setAddress(data?.user?.address ?? '');
-      } catch { /* ignore */ }
+      } catch {/* ignore */}
     };
     load();
     return () => { ignore = true; };
   }, [userId]);
 
+  // โหลดรายการสินค้า
+  useEffect(() => {
+    let ignore = false;
+    const loadProducts = async () => {
+      try {
+        setLoadingProducts(true);
+        setLoadErr(null);
+        const res = await fetch('/api/products', { cache: 'no-store' });
+        const raw = await res.json();
+        const list: DBProduct[] = Array.isArray(raw) ? raw : (raw?.products ?? []);
+        if (!ignore) setAllProducts((list ?? []).filter(Boolean));
+      } catch (e) {
+        if (!ignore) setLoadErr('โหลดรายการสินค้าไม่สำเร็จ');
+      } finally {
+        if (!ignore) setLoadingProducts(false);
+      }
+    };
+    loadProducts();
+    return () => { ignore = true; };
+  }, []);
+
+  // ตัวเลือก "รุ่นสินค้า"
+  const productOptions = useMemo(() => {
+    const inCat = allProducts.filter(p => !p.category || p.category === category);
+    const names = Array.from(new Set(inCat.map(p => p.name).filter(Boolean)));
+    return names.sort((a, b) => a.localeCompare(b, 'th'));
+  }, [allProducts, category]);
+
+  // ถ้าเปลี่ยนหมวดแล้วรุ่นเดิมไม่อยู่ในตัวเลือก ให้รีเซ็ต
+  useEffect(() => {
+    if (productName && !productOptions.includes(productName)) {
+      setProductName('');
+    }
+  }, [category, productOptions, productName]);
+
   const sizeDetail = useMemo(() => {
     if (mode === 'preset') {
-      // ถ้ากรอกหมายเหตุ จะผูกไปใน sizeDetail ด้วยเพื่อไม่ทิ้งข้อมูล
       return notes.trim()
         ? `preset:${presetSize} | notes:${notes.trim()}`
         : `preset:${presetSize}`;
@@ -70,9 +122,8 @@ export default function SpecialSizePage() {
   }, [mode, presetSize, chest, length, notes]);
 
   const qtyNumber = typeof quantity === 'number' ? quantity : Number(quantity || 0);
-  const validQty  = Number.isFinite(qtyNumber) && qtyNumber >= 5; // ★ ตาม API ใหม่ (ขั้นต่ำ 5)
+  const validQty  = Number.isFinite(qtyNumber) && qtyNumber >= 5;
 
-  // ต้องมี userId + email เพราะ API ฝั่ง POST บังคับทั้งคู่
   const canSubmit = useMemo(() => {
     const baseFilled =
       firstName.trim() &&
@@ -105,7 +156,7 @@ export default function SpecialSizePage() {
     if (!email.trim())     return 'กรอกอีเมล';
     if (!address.trim())   return 'กรอกที่อยู่';
     if (!category.trim())  return 'กรอกประเภทสินค้า';
-    if (!productName.trim()) return 'กรอกรุ่นสินค้า';
+    if (!productName.trim()) return 'เลือกรุ่นสินค้าที่มีอยู่ในระบบ';
     if (!color.trim())     return 'กรอกสีหรือโทนสีสินค้า';
     if (!validQty)         return 'จำนวนขั้นต่ำ 5 ตัว';
     if (mode === 'preset' && !presetSize.trim()) return 'ระบุชื่อไซส์ (เช่น 2XL)';
@@ -143,7 +194,6 @@ export default function SpecialSizePage() {
       setSubmitting(true);
       setMessage(null);
 
-      // โหลดข้อมูลตาม API ใหม่
       const payload = {
         userId,
         email: email.trim(),
@@ -151,11 +201,11 @@ export default function SpecialSizePage() {
         lastName: lastName.trim(),
         phone: phone.trim(),
         address: address.trim(),
-        category: category.trim(),         // เดิม productType
-        productName: productName.trim(),   // เดิม model
-        color: color.trim(),               // ★ เพิ่มฟิลด์
+        category: category.trim(),
+        productName: productName.trim(),
+        color: color.trim(),
         quantity: qtyNumber,
-        sizeDetail,                        // รวม preset/custom (+ notes) ไว้แล้ว
+        sizeDetail,
       };
 
       const res = await fetch('/api/special-orders', {
@@ -213,18 +263,46 @@ export default function SpecialSizePage() {
             </div>
 
             <h3 className={styles.sectionTitle}>รายละเอียดสินค้า</h3>
+
             <div className={styles.field}>
               <label>ประเภทสินค้า</label>
-              <input value={category} onChange={(e) => setCategory(e.target.value)} />
+              <input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+              <div className={styles.hint}>เปลี่ยนหมวดเพื่อกรอง “รุ่นสินค้า” ให้ตรงหมวด</div>
             </div>
+
             <div className={styles.field}>
-              <label>รุ่นสินค้า</label>
-              <input value={productName} onChange={(e) => setProductName(e.target.value)} />
+              <label>รุ่นสินค้า (เลือกเฉพาะรุ่นที่มีในระบบ)</label>
+              <select
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                disabled={loadingProducts || productOptions.length === 0}
+              >
+                <option value="">
+                  {loadingProducts
+                    ? 'กำลังโหลดรายการรุ่น...'
+                    : productOptions.length === 0
+                      ? 'ไม่มีรุ่นในหมวดนี้'
+                      : '— กรุณาเลือกรุ่นสินค้า —'}
+                </option>
+                {productOptions.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              {loadErr && <div className={styles.msgErr}>{loadErr}</div>}
             </div>
+
             <div className={styles.field}>
               <label>สี/โทนสี</label>
-              <input value={color} onChange={(e) => setColor(e.target.value)} placeholder="เช่น ดำ / ขาว / กรมท่า" />
+              <input
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder="เช่น ดำ / ขาว / กรมท่า"
+              />
             </div>
+
             <div className={styles.field}>
               <label>จำนวนที่ต้องการ (ขั้นต่ำ 5)</label>
               <input
@@ -290,10 +368,10 @@ export default function SpecialSizePage() {
               <div>โปรดตรวจสอบข้อมูลขนาดและรายละเอียดให้ครบถ้วนก่อนส่ง</div>
             </div>
 
-            {message && (
+            {hydrated && message && (
               <div className={message.startsWith('✅') ? styles.msgOk : styles.msgErr}>{message}</div>
             )}
-            {!canSubmit && !message && (
+            {hydrated && !canSubmit && !message && (
               <div className={styles.msgErr}>กรุณาแก้ไข: {disabledReason}</div>
             )}
 

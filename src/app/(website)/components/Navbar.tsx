@@ -206,6 +206,18 @@ export default function Navbar() {
 
           <button
             className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+            onClick={() => {
+              window.open('https://www.facebook.com/profile.php?id=100084642483976', '_blank');
+              setOpen(false);
+            }}
+            role="menuitem"
+          >
+            CONTACT
+          </button>
+
+
+          <button
+            className="block w-full text-left px-4 py-2 hover:bg-gray-100"
             onClick={async () => {
               await fetch('/api/logout', { method: 'POST' });
               try { localStorage.removeItem('userId'); } catch {}
