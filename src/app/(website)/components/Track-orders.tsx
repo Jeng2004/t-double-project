@@ -73,9 +73,7 @@ type OrderApi = {
   createdAtThai?: string | null;
   orderItems?: OrderItemApi[];
   user?: { id?: string; email?: string | null; name?: string | null } | null;
-  /** ✅ ใช้ตัดสินว่าไม่ควรแสดง “รอชำระเงิน” */
   isPaid?: boolean | null;
-  /** เผื่อมีระบบส่ง paymentStatus มา เช่น 'succeeded' */
   paymentStatus?: string | null;
 };
 
@@ -93,7 +91,6 @@ type SpecialOrderApi = {
   sizeLabel?: string | null;
   user?: { id?: string; email?: string | null; name?: string | null } | null;
   paymentUrl?: string | null;
-  // เผื่ออนาคตมีบอกสถานะเงิน
   paymentStatus?: string | null;
 };
 
@@ -144,7 +141,6 @@ const toStatus = (s?: string | null): AllowedStatus => {
   }
 };
 
-/** ✅ แปลงสถานะโดยพิจารณา isPaid/paymentStatus */
 const deriveStatus = (
   raw?: string | null,
   opts?: { isPaid?: boolean | null; paymentStatus?: string | null }
@@ -158,10 +154,7 @@ const deriveStatus = (
         ? /paid|success|succeed|succeeded/gi.test(opts!.paymentStatus!)
         : false;
 
-  // ถ้าจ่ายแล้ว ไม่ควรอยู่ “รอชำระเงิน” → ดันขึ้นเป็น “รอดำเนินการ”
-  if (paid && base === 'รอชำระเงิน') {
-    base = 'รอดำเนินการ';
-  }
+  if (paid && base === 'รอชำระเงิน') base = 'รอดำเนินการ';
   return base;
 };
 
@@ -219,6 +212,33 @@ function parseSizeDetail(input?: string | null): { displaySize?: string; notes?:
   }
 
   return { displaySize, notes };
+}
+
+/** ให้ค่าเวลาเป็นตัวเลข (ms) เพื่อใช้ sort ใหม่→เก่า ได้เสถียร */
+function orderTime(iso?: string, thai?: string | null): number {
+  // ใช้ createdAt (ISO) เป็นหลัก
+  const t1 = iso ? Date.parse(iso) : NaN;
+  if (!Number.isNaN(t1)) return t1;
+
+  // เผื่อบางที่ส่ง createdAtThai มาเป็นสตริงไทย → พยายาม parse ถ้า parse ไม่ได้ให้เป็น 0
+  const t2 = thai ? Date.parse(thai) : NaN;
+  return Number.isNaN(t2) ? 0 : t2;
+}
+
+/** เปรียบเทียบสองออเดอร์สำหรับ sort: ใหม่ → เก่า */
+function compareOrdersDesc(a: OrderRow, b: OrderRow): number {
+  const ta = orderTime(a.createdAt, a.createdAtThai);
+  const tb = orderTime(b.createdAt, b.createdAtThai);
+
+  if (tb !== ta) return tb - ta;
+
+  // ถ้าเวลาเท่ากัน ให้เรียง id แบบ “ใหม่ก่อน” (เผื่อ id เป็นตัวเลข/สตริงตัวเลข)
+  const na = Number(a.id);
+  const nb = Number(b.id);
+  if (Number.isFinite(na) && Number.isFinite(nb) && nb !== na) return nb - na;
+
+  // fallback: เทียบสตริงแบบย้อนกลับ
+  return String(b.id).localeCompare(String(a.id));
 }
 
 export default function TrackOrders({ orderId }: Props) {
@@ -351,11 +371,8 @@ export default function TrackOrders({ orderId }: Props) {
           (r) => r.user?.id === uid || (!!currentEmail && r.user?.email === currentEmail)
         );
 
-        const combined = [...mineNormal, ...mineSpecial].sort((a, b) => {
-          const ax = a.createdAtThai ?? a.createdAt;
-          const bx = b.createdAtThai ?? b.createdAt;
-          return (new Date(bx).getTime() || 0) - (new Date(ax).getTime() || 0);
-        });
+        // ✅ เรียงใหม่ → เก่า อย่างเสถียร
+        const combined = [...mineNormal, ...mineSpecial].sort(compareOrdersDesc);
 
         setRows(orderId ? combined.filter((r) => r.id === orderId) : combined);
       } catch (e) {

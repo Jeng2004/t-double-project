@@ -87,6 +87,9 @@ export default function SpecialDetailsPage() {
   const [returning, setReturning] = useState(false);
   const [returnMsg, setReturnMsg] = useState<string | null>(null);
 
+  // ✅ พรีวิวรูปที่อัปโหลด (blob URLs)
+  const [returnPreviews, setReturnPreviews] = useState<string[]>([]);
+
   useEffect(() => {
     let ignore = false;
     const load = async () => {
@@ -115,6 +118,29 @@ export default function SpecialDetailsPage() {
     load();
     return () => { ignore = true; };
   }, [id]);
+
+  // ✅ สร้าง/ล้างพรีวิวเมื่อผู้ใช้เลือกไฟล์คืนสินค้า
+  useEffect(() => {
+    // ล้างพรีวิวเก่าก่อน
+    returnPreviews.forEach(u => URL.revokeObjectURL(u));
+
+    if (!returnFiles || returnFiles.length === 0) {
+      setReturnPreviews([]);
+      return;
+    }
+    const selected = Array.from(returnFiles).slice(0, 5); // จำกัด 5 รูป
+    const urls = selected
+      .filter(f => f.type.startsWith('image/'))
+      .map(f => URL.createObjectURL(f));
+
+    setReturnPreviews(urls);
+
+    // cleanup เมื่อเปลี่ยนไฟล์หรือ unmount
+    return () => {
+      urls.forEach(u => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnFiles]);
 
   const { sizeLabel, notes } = useMemo(() => parseSizeDetail(order?.sizeDetail), [order?.sizeDetail]);
   const unitPrice = typeof order?.price === 'number' ? order?.price : null;
@@ -199,6 +225,7 @@ export default function SpecialDetailsPage() {
       if (!res.ok) throw new Error((data && data.error) || 'ส่งคำขอคืนสินค้าไม่สำเร็จ');
       setReturnMsg('✅ ส่งคำขอคืนสินค้าเรียบร้อย (รอตรวจสอบ)');
       setReturnFiles(null);
+      setReturnPreviews([]); // ล้างพรีวิวหลังส่งสำเร็จ
     } catch (e) {
       setReturnMsg(`❌ ${e instanceof Error ? e.message : 'เกิดข้อผิดพลาด'}`);
     } finally {
@@ -367,6 +394,47 @@ export default function SpecialDetailsPage() {
                 onChange={(e) => setReturnFiles(e.target.files)}
                 disabled={!canReturnUI || returning}
               />
+
+              {/* ✅ พรีวิวรูปที่เลือก */}
+              {returnPreviews.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
+                    gap: 12,
+                  }}
+                >
+                  {returnPreviews.map((src, i) => (
+                    <div
+                      key={src}
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        paddingBottom: '100%',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                        background: '#f7f7f7',
+                      }}
+                      title={`รูปที่ ${i + 1}`}
+                    >
+                      <img
+                        src={src}
+                        alt={`Preview ${i + 1}`}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <textarea
                 className={styles.textarea}
                 placeholder="ระบุเหตุผล (อธิบายปัญหา/สภาพสินค้า)"

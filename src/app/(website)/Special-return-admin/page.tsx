@@ -5,11 +5,22 @@ import Image from 'next/image';
 import NavbarAdmin from '../components/NavbarAdmin';
 import styles from './Special-return-admin.module.css';
 
+type ReturnRequestRaw = {
+  id: string;
+  specialOrderId: string;
+  reason: string | null;
+  images: string[];
+  status: string;                // อาจเป็น 'pending' หรือ ไทย
+  adminNote?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type ReturnRequest = {
   id: string;
   specialOrderId: string;
   reason: string | null;
-  images: string[];             // public path เช่น /uploads/xxx.jpg
+  images: string[];
   status: 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ';
   adminNote?: string | null;
   createdAt?: string;
@@ -23,7 +34,7 @@ type RequestWithOrder = ReturnRequest & {
     firstName?: string | null;
     lastName?: string | null;
     email?: string | null;
-    status?: string | null;
+    status?: string | null; // raw -> จะแปลงตอนแสดงผล
   } | null;
 };
 
@@ -35,6 +46,53 @@ const fmt = (iso?: string) => {
     return iso;
   }
 };
+
+/** แปลงสถานะคำขอคืนสินค้า (request) ให้เป็นไทย */
+function toThaiReturnStatus(s?: string | null): 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ' {
+  const raw = String(s ?? '').trim();
+  if (!raw || /^(null|undefined|empty)$/i.test(raw)) return 'รอดำเนินการ';
+
+  // ถ้าเป็นไทยอยู่แล้ว
+  if (raw === 'รอดำเนินการ' || raw === 'อนุมัติ' || raw === 'ปฏิเสธ') {
+    return raw as 'รอดำเนินการ' | 'อนุมัติ' | 'ปฏิเสธ';
+  }
+
+
+  const v = raw.replace(/[_-]+/g, ' ').toLowerCase().trim();
+  if (/^(pending|in review|in\s*review|await|awaiting|waiting)/.test(v)) return 'รอดำเนินการ';
+  if (/^(approve|approved|accept|accepted)/.test(v)) return 'อนุมัติ';
+  if (/^(reject|rejected|deny|denied|decline|declined)/.test(v)) return 'ปฏิเสธ';
+
+  // ดีฟอลต์ให้เป็นรอดำเนินการ
+  return 'รอดำเนินการ';
+}
+
+/** แปลงสถานะออเดอร์ (special order) ให้เป็นไทย */
+function toThaiOrderStatus(s?: string | null): string {
+  const raw = String(s ?? '').trim();
+  if (!raw) return '-';
+
+  if (
+    /ยกเลิก\s*-?\s*คืนเงินเรียบร้อย|ยกเลิก|รอชำระเงิน|รอดำเนินการ|กำลังดำเนินการจัดเตรียมสินค้า|กำลังดำเนินการจัดส่งสินค้า|จัดส่งสินค้าสำเร็จเเล้ว|ลูกค้าคืนสินค้า|กำลังจัดส่งคืนสินค้า/
+      .test(raw)
+  ) {
+    return raw;
+  }
+
+  const v = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toLowerCase().trim();
+
+  // ระวังคิวเรียงลำดับ: จับ "pending payment" ก่อน "pending" ทั่วไป
+  if (/(pending\s*payment|waiting\s*for\s*payment|unpaid|pay\s*pending)/.test(v)) return 'รอชำระเงิน';
+  if (/(pending|await|wait)/.test(v)) return 'รอดำเนินการ';
+  if (/(prepar|pack|ready|process(ing)?)/.test(v)) return 'กำลังดำเนินการจัดเตรียมสินค้า';
+  if (/(ship|in\s*transit|courier|delivery\s*in\s*progress)/.test(v)) return 'กำลังดำเนินการจัดส่งสินค้า';
+  if (/(deliver(ed)?|complete(d)?|success(ed)?)/.test(v)) return 'จัดส่งสินค้าสำเร็จเเล้ว';
+  if (/(customer).*(return|refund)|returned\s*by\s*customer/.test(v)) return 'ลูกค้าคืนสินค้า';
+  if (/(return).*(ship|ing|in\s*transit)/.test(v)) return 'กำลังจัดส่งคืนสินค้า';
+  if (/(cancel(l)?(ed)?|void|abort)/.test(v)) return 'ยกเลิก';
+
+  return raw;
+}
 
 export default function SpecialReturnAdminPage() {
   const [rows, setRows] = useState<RequestWithOrder[]>([]);
@@ -51,12 +109,18 @@ export default function SpecialReturnAdminPage() {
       setLoading(true);
       setErr(null);
       try {
-        // ดึงรายการคำขอทั้งหมด
+        // ดึงรายการคำขอทั้งหมด (อาจ status= pending/approved/rejected)
         const res = await fetch('/api/returnspecialrequest', { cache: 'no-store' });
         if (!res.ok) throw new Error(await res.text());
-        const list = (await res.json()) as ReturnRequest[];
+        const listRaw = (await res.json()) as ReturnRequestRaw[];
 
-        // enrich: ลองดึงข้อมูล special order บางส่วน (trackingId/ชื่อ) แบบขี้เกียจทีละรายการ
+        // แปลงสถานะ request เป็นไทยทันที
+        const list: ReturnRequest[] = listRaw.map((r) => ({
+          ...r,
+          status: toThaiReturnStatus(r.status),
+        }));
+
+        // enrich: ดึงข้อมูล special order เพิ่ม (tracking/ชื่อ/สถานะ)
         const enriched: RequestWithOrder[] = [];
         for (const r of list) {
           try {
@@ -70,7 +134,7 @@ export default function SpecialReturnAdminPage() {
                 firstName: data?.firstName ?? null,
                 lastName: data?.lastName ?? null,
                 email: data?.email ?? null,
-                status: data?.status ?? null,
+                status: data?.status ?? null, // จะแปลงตอนแสดงผล
               };
             }
             enriched.push({ ...r, specialOrder });
@@ -92,13 +156,24 @@ export default function SpecialReturnAdminPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return rows;
+
     return rows.filter((r) => {
       const id = r.id.toLowerCase();
-      const so = r.specialOrder;
       const orderId = r.specialOrderId.toLowerCase();
+      const so = r.specialOrder;
       const tracking = (so?.trackingId ?? '').toLowerCase();
       const name = [so?.firstName ?? '', so?.lastName ?? ''].join(' ').trim().toLowerCase();
-      return id.includes(term) || orderId.includes(term) || tracking.includes(term) || name.includes(term);
+      const orderStatusTH = toThaiOrderStatus(so?.status).toLowerCase();
+      const requestStatusTH = toThaiReturnStatus(r.status).toLowerCase(); // ✅ ใช้สถานะไทยเสมอ
+
+      return (
+        id.includes(term) ||
+        orderId.includes(term) ||
+        tracking.includes(term) ||
+        name.includes(term) ||
+        orderStatusTH.includes(term) ||
+        requestStatusTH.includes(term)
+      );
     });
   }, [rows, q]);
 
@@ -124,10 +199,16 @@ export default function SpecialReturnAdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'อัปเดตสถานะไม่สำเร็จ');
 
-      // อัปเดตในตาราง
       setRows((prev) =>
         prev.map((r) =>
-          r.id === activeId ? { ...r, status, adminNote: note, updatedAt: new Date().toISOString() } : r
+          r.id === activeId
+            ? {
+                ...r,
+                status: toThaiReturnStatus(status), // ✅ ให้แน่ใจว่าเป็นไทย
+                adminNote: note,
+                updatedAt: new Date().toISOString(),
+              }
+            : r
         )
       );
       closePanel();
@@ -138,7 +219,7 @@ export default function SpecialReturnAdminPage() {
     }
   };
 
-  const pillCls = (s: RequestWithOrder['status']) => {
+  const pillCls = (s: ReturnRequest['status']) => {
     switch (s) {
       case 'รอดำเนินการ':
         return `${styles.pill} ${styles.pillPending}`;
@@ -161,7 +242,7 @@ export default function SpecialReturnAdminPage() {
             <span className={styles.searchIcon}>🔍</span>
             <input
               className={styles.search}
-              placeholder="ค้นหา: Request ID, Order ID, Tracking, ชื่อ"
+              placeholder="ค้นหา: Request ID, Order ID, Tracking, ชื่อ, สถานะ"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -193,26 +274,33 @@ export default function SpecialReturnAdminPage() {
                     <td colSpan={8} className={styles.empty}>ไม่พบคำขอคืนสินค้า</td>
                   </tr>
                 ) : (
-                  filtered.map((r) => (
-                    <tr key={r.id}>
-                      <td className={styles.mono}>{r.id}</td>
-                      <td className={styles.mono}>{r.specialOrderId}</td>
-                      <td className={styles.mono}>{r.specialOrder?.trackingId ?? '-'}</td>
-                      <td>{[r.specialOrder?.firstName, r.specialOrder?.lastName].filter(Boolean).join(' ') || '-'}</td>
-                      <td>{r.specialOrder?.status ?? '-'}</td>
-                      <td>{fmt(r.createdAt)}</td>
-                      <td><span className={pillCls(r.status)}>{r.status}</span></td>
-                      <td>
-                        <button
-                          className={styles.btnSmall}
-                          onClick={() => openPanel(r)}
-                          title="ตรวจสอบ / อนุมัติ / ปฏิเสธ"
-                        >
-                          จัดการ
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  filtered.map((r) => {
+                    const statusTH = toThaiReturnStatus(r.status); // ✅ ใช้ไทยแน่นอน
+                    return (
+                      <tr key={r.id}>
+                        <td className={styles.mono}>{r.id}</td>
+                        <td className={styles.mono}>{r.specialOrderId}</td>
+                        <td className={styles.mono}>{r.specialOrder?.trackingId ?? '-'}</td>
+                        <td>{[r.specialOrder?.firstName, r.specialOrder?.lastName].filter(Boolean).join(' ') || '-'}</td>
+                        {/* ✅ ใช้สถานะไทยที่แม็พแล้ว */}
+                        <td>{toThaiOrderStatus(r.specialOrder?.status)}</td>
+                        <td>{fmt(r.createdAt)}</td>
+                        {/* ✅ แสดงสถานะคำขอเป็นไทยเสมอ */}
+                        <td>
+                          <span className={pillCls(statusTH as ReturnRequest['status'])}>{statusTH}</span>
+                        </td>
+                        <td>
+                          <button
+                            className={styles.btnSmall}
+                            onClick={() => openPanel(r)}
+                            title="ตรวจสอบ / อนุมัติ / ปฏิเสธ"
+                          >
+                            จัดการ
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -227,6 +315,7 @@ export default function SpecialReturnAdminPage() {
           <div className={styles.drawer} role="dialog" aria-modal="true">
             {(() => {
               const r = rows.find((x) => x.id === activeId)!;
+              const statusTH = toThaiReturnStatus(r.status); // ✅ ไทยใน drawer
               return (
                 <>
                   <div className={styles.drawerHeader}>
@@ -278,9 +367,12 @@ export default function SpecialReturnAdminPage() {
                         )}
                       </div>
 
+                      <div className={styles.k}>สถานะคำสั่งซื้อ (ล่าสุด)</div>
+                      <div className={styles.v}>{toThaiOrderStatus(r.specialOrder?.status)}</div>
+
                       <div className={styles.k}>สถานะคำขอ</div>
                       <div className={styles.v}>
-                        <span className={pillCls(r.status)}>{r.status}</span>
+                        <span className={pillCls(statusTH as ReturnRequest['status'])}>{statusTH}</span>
                       </div>
                     </div>
 
@@ -301,14 +393,14 @@ export default function SpecialReturnAdminPage() {
                     <button
                       className={`${styles.btn} ${styles.btnReject}`}
                       onClick={() => doUpdate('ปฏิเสธ')}
-                      disabled={saving || r.status === 'ปฏิเสธ'}
+                      disabled={saving || statusTH === 'ปฏิเสธ'}
                     >
                       {saving ? 'กำลังบันทึก…' : 'ปฏิเสธ'}
                     </button>
                     <button
                       className={`${styles.btn} ${styles.btnApprove}`}
                       onClick={() => doUpdate('อนุมัติ')}
-                      disabled={saving || r.status === 'อนุมัติ'}
+                      disabled={saving || statusTH === 'อนุมัติ'}
                     >
                       {saving ? 'กำลังบันทึก…' : 'อนุมัติ'}
                     </button>

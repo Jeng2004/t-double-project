@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './editstock.module.css';
 
 type EditStockBasicProps = {
@@ -12,6 +12,15 @@ type EditStockBasicProps = {
   onClose: () => void;               // ← ปิดโมดัล
   onSaved?: () => void;              // ← callback หลังบันทึกสำเร็จ
 };
+
+// ให้การเปรียบเทียบชื่อ “แม่น” ขึ้น (กันเคสช่องว่าง/ตัวพิมพ์/ยูนิโค้ดผสม)
+function normalizeName(s: string) {
+  return s
+    .normalize('NFC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
 
 export default function EditStockBasic({
   id,
@@ -31,6 +40,10 @@ export default function EditStockBasic({
   const [ok, setOk] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // เช็กชื่อซ้ำแบบ client (debounce)
+  const [checking, setChecking] = useState(false);
+  const [dupClient, setDupClient] = useState(false);
+
   // แสดงภาพเดิม (อ่านอย่างเดียว) — จะถูกแทนที่ก็ต่อเมื่อติ๊ก “แทนที่ภาพทั้งหมด”
   const existing = useMemo(() => initialImageUrls ?? [], [initialImageUrls]);
 
@@ -41,25 +54,68 @@ export default function EditStockBasic({
     setNewFiles(files);
   };
 
+  // 🔎 เช็กชื่อซ้ำล่วงหน้า (เรียก /api/products แล้วเทียบในฝั่ง client)
+  useEffect(() => {
+    if (!open) return;
+    const target = normalizeName(name);
+    const current = normalizeName(initialName);
+
+    // ถ้าชื่อไม่เปลี่ยน/ว่าง → ไม่ต้องเช็ก
+    if (!target || target === current) {
+      setDupClient(false);
+      return;
+    }
+
+    let cancel = false;
+    const h = setTimeout(async () => {
+      try {
+        setChecking(true);
+        setErr(null);
+
+        // ดึงรายการสินค้า (พอสำหรับ compare)
+        const res = await fetch('/api/products', { cache: 'no-store', credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const list: Array<{ id: string | number; name: string }> = await res.json();
+
+        const clash = list.some((p) => String(p.id) !== String(id) && normalizeName(p.name) === target);
+        if (!cancel) setDupClient(clash);
+      } catch {
+        // ถ้าเช็กไม่ได้ ก็ไม่บล็อก—ไปให้ backend ตัดสิน (เรายังกันที่ API อีกชั้น)
+        if (!cancel) setDupClient(false);
+      } finally {
+        if (!cancel) setChecking(false);
+      }
+    }, 350); // debounce 350ms
+
+    return () => { cancel = true; clearTimeout(h); };
+  }, [name, initialName, id, open]);
+
   const handleSave = async () => {
     try {
       setSaving(true);
       setErr(null);
       setOk(null);
 
+      // ป้องกันกดบันทึกตอนชื่อซ้ำที่ตรวจเจอฝั่ง client
+      if (!name.trim()) {
+        setErr('กรุณากรอกชื่อสินค้า');
+        setSaving(false);
+        return;
+      }
+      if (dupClient) {
+        setErr('ชื่อนี้ถูกใช้แล้ว กรุณาใช้ชื่ออื่น');
+        setSaving(false);
+        return;
+      }
+
       const fd = new FormData();
       fd.append('name', name.trim());
       fd.append('category', category.trim());
 
-      // แนวทาง “แบบเดิมของ API ที่คุณมีอยู่ตอนนี้”
-      // - ถ้าส่ง field image (ไฟล์ใหม่อย่างน้อย 1 ไฟล์) → API จะตั้ง imageUrls = ไฟล์ชุดใหม่
-      // - ถ้าไม่ส่ง field image → API จะคง imageUrls เดิม
-      // ดังนั้นการ “ลบภาพเก่า” ทำได้โดยเลือก “แทนที่ภาพทั้งหมด” แล้วอัปโหลดไฟล์ชุดใหม่
       if (replaceAllImages) {
         newFiles.forEach((f) => fd.append('image', f));
       }
 
-      // ใช้ PATCH สำหรับแก้เฉพาะส่วน (ชื่อ/หมวดหมู่/รูป) ให้เบากว่า PUT
       const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: fd,
@@ -67,13 +123,18 @@ export default function EditStockBasic({
       });
 
       if (!res.ok) {
+        // ✅ ดักสถานะชื่อซ้ำที่มาจาก API (กันชัวร์ชั้น backend)
+        if (res.status === 409) {
+          setErr('ชื่อนี้ถูกใช้แล้ว กรุณาใช้ชื่ออื่น');
+          return; // ไม่ปิดโมดัล
+        }
         const t = await res.text();
         throw new Error(`PATCH ${res.status}: ${t}`);
       }
 
       setOk('บันทึกสำเร็จ');
       onSaved?.();
-      onClose(); // ปิดโมดัลหลังเซฟ
+      onClose(); // ปิดโมดัลหลังเซฟสำเร็จเท่านั้น
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     } finally {
@@ -87,6 +148,13 @@ export default function EditStockBasic({
   };
 
   if (!open) return null;
+
+  // สถานะ error ของช่องชื่อ (รวมทั้งกรณีตรวจเจอซ้ำใน client)
+  const nameHasError =
+    (!!err && /ชื่อ.*(ซ้ำ|ใช้แล้ว)/.test(err)) || dupClient;
+
+  // ปิดปุ่มเมื่อ: กำลังเซฟ | ชื่อว่าง | กำลังเช็กชื่อ | พบชื่อซ้ำ
+  const saveDisabled = saving || !name.trim() || checking || dupClient;
 
   return (
     <div className={styles.backdrop} onMouseDown={onBackdropClick}>
@@ -109,7 +177,15 @@ export default function EditStockBasic({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="เช่น Classic Tee"
+              aria-invalid={nameHasError}
+              title={nameHasError ? 'ชื่อนี้ถูกใช้แล้ว กรุณาใช้ชื่ออื่น' : undefined}
             />
+            <div className={styles.helperRow}>
+              {checking && <small className={styles.note}>กำลังตรวจสอบชื่อซ้ำ…</small>}
+              {dupClient && !checking && (
+                <small className={styles.errInline}>ชื่อนี้ถูกใช้แล้ว</small>
+              )}
+            </div>
           </div>
           <div>
             <label className={styles.label}>หมวดหมู่</label>
@@ -206,8 +282,8 @@ export default function EditStockBasic({
           <button className={styles.btnGhost} onClick={onClose} disabled={saving}>
             ยกเลิก
           </button>
-          <button className={styles.btnPrimary} onClick={handleSave} disabled={saving}>
-            {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+          <button className={styles.btnPrimary} onClick={handleSave} disabled={saveDisabled}>
+            {saving ? 'กำลังบันทึก…' : dupClient ? 'ชื่อซ้ำ' : checking ? 'กำลังตรวจสอบ…' : 'บันทึก'}
           </button>
         </div>
       </div>
