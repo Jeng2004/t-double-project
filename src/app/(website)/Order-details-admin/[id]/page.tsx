@@ -406,13 +406,7 @@ export default function OrderDetailsAdminPage() {
                 >
                   {act === 'confirm' ? 'กำลังคอนเฟิร์ม…' : 'ยืนยันการสั่งซื้อ'}
                 </button>
-                <button
-                  className={styles.btnDanger}
-                  disabled={act === 'cancel'}
-                  onClick={() => changeStatus('ยกเลิก', 'cancel')}
-                >
-                  {act === 'cancel' ? 'กำลังยกเลิก…' : 'ยกเลิกคำสั่งซื้อ'}
-                </button>
+
               </>
             )}
 

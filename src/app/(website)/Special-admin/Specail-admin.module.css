@@ -10,13 +10,68 @@
 .table th, .table td { padding: 10px 14px; border-bottom: 1px solid #f4f4f4; text-align: left; }
 .empty { text-align: center; color: #888; }
 
-.pill { padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; cursor: pointer; }
-.pillCancelled { background: #ffe9e9; color: #cf1322; }
-.pillUnpaid { background: #fff7e6; color: #d46b08; }
-.pillPending { background: #f0f0f0; color: #595959; }
-.pillPreparing { background: #e6f0ff; color: #1d4ed8; }
-.pillShipping { background: #fff1e6; color: #d46b08; }
-.pillCompleted { background: #edfff1; color: #389e0d; }
+/* ป้ายสถานะหลัก */
+.pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  background: #fffbe6; /* สีพื้นเบาเหมือน badge */
+  color: #b36b00;
+  border: 1px solid #ffe58f; /* ✅ เพิ่มขอบ */
+  cursor: pointer;
+}
+
+/* ❌ ยกเลิก */
+.pillCancelled {
+  background: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ffa39e;
+}
+
+/* 💰 รอชำระเงิน */
+.pillUnpaid {
+  background: #fff7e6;
+  color: #d46b08;
+  border: 1px solid #ffd591;
+}
+
+/* ⏳ รอดำเนินการ */
+.pillPending {
+  background: #fafafa;
+  color: #595959;
+  border: 1px solid #d9d9d9;
+}
+
+/* 🧰 กำลังจัดเตรียม */
+.pillPreparing {
+  background: #e6f0ff;
+  color: #1d4ed8;
+  border: 1px solid #91caff;
+}
+
+/* 🚚 กำลังจัดส่ง */
+.pillShipping {
+  background: #fff1e6;
+  color: #d46b08;
+  border: 1px solid #ffd591;
+}
+
+/* ✅ จัดส่งสำเร็จ */
+.pillCompleted {
+  background: #f6ffed;
+  color: #389e0d;
+  border: 1px solid #b7eb8f;
+}
+
+/* 📦 ลูกค้าคืนสินค้า (สามารถปรับสีเองได้) */
+.pillReturn {
+  background: #fffbe6;
+  color: #b36b00;
+  border: 1px solid #ffe58f;
+}
+
 
 .overlay { position: fixed; inset: 0; z-index: 50; }
 .popover { position: fixed; z-index: 60; width: 300px; background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.1); }
