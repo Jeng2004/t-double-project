@@ -54,9 +54,46 @@ export async function PATCH(
       );
     }
 
+    // 🛡️ กันกดซ้ำ: ต้องอยู่สถานะ 'รอดำเนินการ' เท่านั้น
+    if (request.status !== "รอดำเนินการ") {
+      // ถ้ากดซ้ำสถานะเดิม
+      if (request.status === status) {
+        return NextResponse.json(
+          { error: `คำขอนี้ถูก${status}ไปแล้ว ไม่สามารถทำซ้ำได้` },
+          { status: 409 }
+        );
+      }
+      // ถ้าพยายาม "เปลี่ยน" จากอนุมัติ ↔ ปฏิเสธ หลังตัดสินแล้ว
+      return NextResponse.json(
+        {
+          error: `คำขอถูกดำเนินการแล้ว (สถานะปัจจุบัน: ${request.status}) จึงไม่สามารถเปลี่ยนเป็น '${status}' ได้`,
+        },
+        { status: 409 }
+      );
+    }
+
+    // 🛡️ กันอนุมัติ/คืนเงินซ้ำ: ถ้าออเดอร์นี้เคยคืนเงิน/ถูกตั้งสถานะคืนสินค้าแล้ว ให้บล็อก
+    if (
+      request.specialOrder &&
+      (request.specialOrder.status === "ลูกค้าคืนสินค้า" ||
+        !!request.specialOrder.refundId)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "คำขอนี้ถูกดำเนินการด้านการเงินหรือปิดงานไปแล้ว ไม่สามารถทำซ้ำได้",
+        },
+        { status: 409 }
+      );
+    }
+
+    // ใช้ idempotency ของ Stripe เผื่อเคสคลิกซ้ำ/ส่งซ้ำพร้อมกัน
+    const clientKey = req.headers.get("x-idempotency-key") || "";
+    const stripeIdemKey = `return-special:${id}:${status}:${clientKey || "default"}`;
+
     let refundId: string | null = null;
 
-    // ✅ ถ้าอนุมัติ → Refund Stripe
+    // ✅ ถ้าอนุมัติ → Refund Stripe (ใช้ idempotency key กันซ้ำ)
     if (status === "อนุมัติ") {
       if (!request.specialOrder?.paymentIntentId) {
         return NextResponse.json(
@@ -65,9 +102,14 @@ export async function PATCH(
         );
       }
 
-      const refund = await stripe.refunds.create({
-        payment_intent: request.specialOrder.paymentIntentId,
-      });
+      const refund = await stripe.refunds.create(
+        {
+          payment_intent: request.specialOrder.paymentIntentId,
+        },
+        {
+          idempotencyKey: stripeIdemKey,
+        }
+      );
       refundId = refund.id;
 
       // อัปเดต SpecialOrder ด้วย
@@ -75,24 +117,38 @@ export async function PATCH(
         where: { id: request.specialOrderId },
         data: {
           refundId,
-          status: "ยกเลิก - คืนเงินเรียบร้อย",
+          status: "ลูกค้าคืนสินค้า",
         },
       });
     }
 
-    // ✅ อัปเดตสถานะ + note แอดมิน
-    const updated = await prisma.returnSpecialRequest.update({
-      where: { id },
+    // ✅ อัปเดตสถานะ + note แอดมิน (กันซ้ำด้วยการเช็คสถานะอีกชั้น—กรณีแข่งกัน)
+    // ใช้ updateMany แบบมีเงื่อนไข status เพื่อป้องกัน race (อัปเดตได้แค่ถ้ายัง 'รอดำเนินการ')
+    const guarded = await prisma.returnSpecialRequest.updateMany({
+      where: { id, status: "รอดำเนินการ" },
       data: {
         status,
         adminNote: adminNote ?? null,
       },
+    });
+
+    // ถ้าอัปเดตไม่ได้ แปลว่ามีอีกคำขอเปลี่ยนสถานะไปก่อนหน้าแล้ว (กันกดซ้ำ/กันเปลี่ยนสถานะ)
+    if (guarded.count === 0) {
+      return NextResponse.json(
+        { error: "คำขอถูกอัปเดตไปแล้วโดยกระบวนการอื่น กรุณารีเฟรชหน้า" },
+        { status: 409 }
+      );
+    }
+
+    // ดึงข้อมูลล่าสุด (สำหรับส่งกลับ/ส่งเมล)
+    const updated = await prisma.returnSpecialRequest.findUnique({
+      where: { id },
       include: { specialOrder: true },
     });
 
     // ✅ ส่งอีเมลแจ้งลูกค้า
     try {
-      if (updated.specialOrder?.email) {
+      if (updated?.specialOrder?.email) {
         await sendEmail(
           updated.specialOrder.email,
           `ผลการตรวจสอบคำขอคืนสินค้า #${updated.specialOrder.trackingId}`,
