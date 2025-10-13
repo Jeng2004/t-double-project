@@ -46,7 +46,6 @@ type OrderRow = {
   } | null;
 };
 
-/** ---------- API types (no any) ---------- */
 type OrderItemApi = {
   id?: string | number;
   productId?: string | number;
@@ -93,6 +92,10 @@ export default function ReturnTheProductPage() {
   // ฟอร์ม
   const [reason, setReason] = useState('');
   const [files, setFiles] = useState<FileList | null>(null);
+
+  // ✅ พรีวิวรูป (blob urls)
+  const [previews, setPreviews] = useState<string[]>([]);
+
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -107,7 +110,6 @@ export default function ReturnTheProductPage() {
         setLoading(true);
         setErr(null);
 
-        // ✅ กันเคสไม่มี id
         if (!id) {
           throw new Error('ลิงก์ไม่ถูกต้อง: ไม่พบรหัสคำสั่งซื้อ');
         }
@@ -116,13 +118,11 @@ export default function ReturnTheProductPage() {
         if (!res.ok) throw new Error(`โหลดคำสั่งซื้อผิดพลาด: ${res.status}`);
         const oData: OrderApi = await res.json();
 
-        // ✅ ตรวจสิทธิ์เจ้าของ
         const ownerId = oData?.user?.id ?? null;
         if (!ownerId || ownerId !== userId) {
           throw new Error('ไม่พบคำสั่งซื้อของคุณหรือไม่มีสิทธิ์เข้าถึง');
         }
 
-        // ✅ map → OrderRow (type-safe)
         const items: OrderItem[] = Array.isArray(oData.orderItems)
           ? oData.orderItems.map((it): OrderItem => ({
               id: String(it.id ?? ''),
@@ -153,7 +153,6 @@ export default function ReturnTheProductPage() {
 
         if (!ignore) {
           setOrder(mapped);
-          // เริ่มต้นจำนวนที่จะคืนเป็น 0 ทุกชิ้น
           setQuantities(Object.fromEntries(items.map((it) => [it.id, 0])));
         }
       } catch (e) {
@@ -163,7 +162,6 @@ export default function ReturnTheProductPage() {
       }
     };
 
-    // มีทั้ง id และ userId แล้วค่อยโหลด
     if (id && userId) load();
 
     return () => {
@@ -184,10 +182,32 @@ export default function ReturnTheProductPage() {
     setQuantities((q) => ({ ...q, [itemId]: safe }));
   };
 
+  // ✅ สร้าง/ล้างพรีวิวเมื่อมีการเลือกไฟล์ใหม่
+  useEffect(() => {
+    // ล้างพรีวิวเก่า
+    previews.forEach((u) => URL.revokeObjectURL(u));
+
+    if (!files || files.length === 0) {
+      setPreviews([]);
+      return;
+    }
+
+    const selected = Array.from(files).slice(0, 5); // จำกัด 5 รูป
+    const urls = selected
+      .filter((f) => f.type.startsWith('image/'))
+      .map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+
+    // cleanup เมื่อ unmount หรือเปลี่ยนไฟล์
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
+
   const onSubmit = async () => {
     if (!order) return;
 
-    // อนุญาตขอคืนเฉพาะเมื่อจัดส่งสำเร็จแล้ว (ให้สอดคล้องกับ API /api/orders/return/[id])
     if (order.status !== 'จัดส่งสินค้าสำเร็จเเล้ว') {
       alert('สามารถคืนสินค้าได้เฉพาะออเดอร์ที่จัดส่งสำเร็จแล้วเท่านั้น');
       return;
@@ -203,17 +223,15 @@ export default function ReturnTheProductPage() {
     try {
       setSubmitting(true);
       const fd = new FormData();
-      fd.append('orderId', order.id); // ✅ API คาดหวัง
+      fd.append('orderId', order.id);
       fd.append('reason', reason);
       fd.append('items', JSON.stringify(items));
       Array.from(files).slice(0, 5).forEach((f) => fd.append('images', f));
 
-      // ✅ ใช้เส้นทางใหม่ /api/orders/return/[id]
       const res = await fetch(`/api/orders/return`, {
         method: 'POST',
         body: fd,
       });
-
 
       if (!res.ok) {
         const t = await res.text();
@@ -284,7 +302,6 @@ export default function ReturnTheProductPage() {
           </section>
 
           {!canReturn ? (
-            // ถ้ายังไม่จัดส่งสำเร็จ แสดงคำอธิบายและปุ่มกลับ
             <section className={styles.section}>
               <p className={styles.error}>
                 สามารถยื่นคำขอคืนสินค้าได้เมื่อคำสั่งซื้ออยู่ในสถานะ “จัดส่งสินค้าสำเร็จเเล้ว”
@@ -342,7 +359,7 @@ export default function ReturnTheProductPage() {
                 </div>
               </section>
 
-              {/* เหตุผล + อัปโหลด */}
+              {/* เหตุผล + อัปโหลด + ✅ พรีวิว */}
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>รายละเอียด/เหตุผลในการขอคืน</h3>
                 <textarea
@@ -351,6 +368,7 @@ export default function ReturnTheProductPage() {
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />
+
                 <div className={styles.uploadRow}>
                   <label className={styles.uploadLabel}>อัปโหลดรูปภาพสินค้า (1–5 รูป)</label>
                   <input
@@ -361,6 +379,47 @@ export default function ReturnTheProductPage() {
                     className={styles.fileInput}
                   />
                 </div>
+
+                {/* ✅ พรีวิวรูปที่เลือก */}
+                {previews.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
+                      gap: 12,
+                    }}
+                  >
+                    {previews.map((src, i) => (
+                      <div
+                        key={src}
+                        style={{
+                          position: 'relative',
+                          width: '100%',
+                          paddingBottom: '100%',
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                          background: '#f7f7f7',
+                        }}
+                        title={`รูปที่ ${i + 1}`}
+                      >
+                        {/* ใช้ <img> ตรง ๆ กับ blob url เพื่อเลี่ยง config domain ของ Next/Image */}
+                        <img
+                          src={src}
+                          alt={`Preview ${i + 1}`}
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               {/* นโยบายการคืน */}
