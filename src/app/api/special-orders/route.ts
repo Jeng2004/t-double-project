@@ -83,6 +83,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ต้องสั่งขั้นต่ำ 5 ตัวขึ้นไป" }, { status: 400 });
     }
 
+    // ✅ ตรวจสอบว่า productName ต้องมีอยู่จริงใน Product (case-insensitive)
+    const productExists = await prisma.product.findFirst({
+      where: { name: { equals: productName, mode: "insensitive" } },
+      select: { id: true, name: true },
+    });
+    if (!productExists) {
+      console.warn("❌ Product not found by name", { productName });
+      return NextResponse.json(
+        { error: "ไม่พบสินค้าในระบบตามชื่อที่ระบุ (กรุณาตรวจสอบชื่อสินค้าให้ตรงกับรายการสินค้า)" },
+        { status: 400 }
+      );
+    }
+
     // ✅ ตรวจสอบ user
     const user = await prisma.user.findUnique({ where: { id: userId } });
     console.log("🔍 User found:", user);
@@ -228,6 +241,19 @@ export async function PUT(req: NextRequest) {
     if (!order) {
       console.error("❌ Order not found for update");
       return NextResponse.json({ error: "ไม่พบคำสั่งซื้อ" }, { status: 404 });
+    }
+
+    // ✅ ตรวจสอบว่า productName ในออเดอร์นี้ยังคงมีอยู่ใน Product (กันกรณีชื่อผิด/ถูกลบ)
+    const productExistsForOrder = await prisma.product.findFirst({
+      where: { name: { equals: order.productName, mode: "insensitive" } },
+      select: { id: true, name: true },
+    });
+    if (!productExistsForOrder) {
+      console.warn("❌ Product not found for order when approving", { productName: order.productName });
+      return NextResponse.json(
+        { error: `ไม่พบสินค้าในระบบตามชื่อที่ระบุสำหรับคำสั่งซื้อนี้: ${order.productName}` },
+        { status: 400 }
+      );
     }
 
     // ✅ สร้าง Stripe Checkout Session
